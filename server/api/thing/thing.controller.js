@@ -13,14 +13,14 @@ var _ = require('lodash');
 var request = require('request');
 var failedTrackCount = 0;
 
-var streamId = undefined;
-
 // Get list of things
 exports.index = function(req, res) {
-    console.log(req);
+    console.log(req.query);
     var username = req.query.username;
     var lastSyncData = req.query.lastSyncDate;
-    streamId = req.query.streamId;
+    var streamId = req.query.streamId;
+
+    res.setHeader("Content-Type", "application/json")
 
     if (streamId !== undefined) {
         if (username.length > 0) {
@@ -32,10 +32,10 @@ exports.index = function(req, res) {
     } else {
         request({
             method: 'POST',
-            uri: "https://api-staging.1self.co/v1/streams",
+            uri: "https://sandbox.1self.co/v1/streams",
             gzip: true,
             headers: {
-                "Authorization": "hello1self:hello1self"
+                "Authorization": "app-id-8aae965172e09b182bede2d71c2b7ebe:app-secret-23e3afadea809f6697d19a8f1754e37df72522b310d57107d5ddb10bda821dd6"
             }
         }, function(error, response, body) {
             // body is the decompressed response body
@@ -57,9 +57,10 @@ exports.index = function(req, res) {
         }
     }
 
+
     res.json({
         "status": "done",
-        "streamid": streamid
+        "streamid": streamId
     });
 };
 
@@ -163,6 +164,10 @@ function writeTrack(track) {
     }
 }
 
+var sendMusicTo1self = function(trackName, trackmbid, trackDuration, trackUrl, artistName, albumName, listenDate, source) {
+    console.log(trackName + "Sent to 1self in stream ");
+};
+
 function onGotTrackData(data, passedThroughTrack) {
     var html = '';
     var track = data.track;
@@ -192,6 +197,3 @@ function onGotTrackData(data, passedThroughTrack) {
     }
 }
 
-var sendMusicTo1self = function(trackName, trackmbid, trackDuration, trackUrl, artistName, albumName, listenDate, source) {
-    console.log(trackName + "Sent to 1self in stream ");
-};

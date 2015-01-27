@@ -4,10 +4,12 @@
   <div class="container">
     <h1>Martin's kickass lastfm integration</h1>
     <p class="lead">Grab your stats from last.fm!</p>
-    <div class="input-group">
-    <span class="input-group-addon">User</span>
-    <input type="text" class="form-control"  placeholder="last.fm username">
-    </div>
+    <form ng-submit="setupSync()" ng-controller="MainCtrl">
+      <div class="input-group">
+      <span class="input-group-addon">User</span>
+      <input type="text" ng-model="name" class="form-control"  placeholder="last.fm username">
+      </div>
+      </form>
   </div>
 </header>
 

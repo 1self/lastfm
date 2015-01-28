@@ -11,68 +11,54 @@
 
 var _ = require('lodash');
 var request = require('request');
+var lib1self = require('lib1self-server');
+
 var failedTrackCount = 0;
 
+var config = {};
+var stream = {};
 // Get list of things
 exports.index = function(req, res) {
     console.log(req.query);
-    var username = req.query.username;
-    var lastSyncData = req.query.lastSyncDate;
-    var streamId = req.query.streamId;
+
+    config.username = req.query.username;
+    config.lastSyncDate = req.query.lastSyncDate;
+    config.streamId = req.query.streamid;
+    config.writeToken = req.headers.authorization;
+    config.server= 'http://localhost:5000';
 
     res.setHeader("Content-Type", "application/json")
-
-    if (streamId !== undefined) {
-        if (username.length > 0) {
-            getRecentTracks(username, 1, null);
-
-        } else {
-            console.log("username blank");
-        }
-    } else {
-        request({
-            method: 'POST',
-            uri: "https://sandbox.1self.co/v1/streams",
-            gzip: true,
-            headers: {
-                "Authorization": "app-id-8aae965172e09b182bede2d71c2b7ebe:app-secret-23e3afadea809f6697d19a8f1754e37df72522b310d57107d5ddb10bda821dd6"
-            }
-        }, function(error, response, body) {
-            // body is the decompressed response body
-            console.log(body);
-        })
-        .on('response', function(response) {
-            // unmodified http.IncomingMessage object
-            response.on('data', function(data) {
-                // compressed data as it is received
-                console.log('received ' + data.length + ' bytes of compressed data')
-            })
-        });
-
-        if (username.length > 0) {
-            getRecentTracks(username, 1, null);
-
-        } else {
-            console.log("username blank");
+    stream = lib1self.loadStream(config, config.streamId, config.writeToken, config.readToken);
+    var eventStart = {
+        objectTags: [ '1self', 'integration', 'lastfm']
+        , actionTags: [ 'sync', 'start' ]
+        , properties: {
+            lastSyncDate: config.lastSyncDate
         }
     }
+    console.log('stream is: ' + stream);
+    stream.send(eventStart, function(error, response){
+        if(error !== undefined){
+            console.log('error:' + error);
+        }
 
-
-    res.json({
-        "status": "done",
-        "streamid": streamId
-    });
+        console.log(response);
+        console.log();
+        getRecentTracks(1, res);
+    })
 };
 
-function getRecentTracks(username, pageNum, lastSyncDate) {
-
+function getRecentTracks(pageNum, res) {
     var url = "http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&api_key=0900562e22abd0500f0432147482cfc1&format=json&limit=200";
     url += "&page=" + pageNum;
-    url += "&user=" + username;
+    url += "&user=" + config.username;
 
+    if (config.lastSyncDate !== undefined){
 
-    if (lastSyncDate)
-        url += "&from=" + lastSyncDate;
+        var unixTimeStamp = Date.parse(config.lastSyncDate) / 1000;
+        console.log(unixTimeStamp);
+        url += "&from=" + unixTimeStamp;
+    }
 
     console.log(url);
 
@@ -84,6 +70,7 @@ function getRecentTracks(username, pageNum, lastSyncDate) {
         // body is the decompressed response body
         console.log('server encoded the data as: ' + (response.headers['content-encoding'] || 'identity'));
         onGotArtistTrackData(JSON.parse(body));
+        res.send(200);
     }).on('data', function(data) {
         // decompressed data as it is received
         console.log('decoded chunk: ');
@@ -146,6 +133,10 @@ function writeTrack(track) {
             gzip: true
         }, function(error, response, body) {
             console.log("onGotTrackData called");
+            console.log(body);
+            if(body === undefined){
+                console.log("error reading track");
+            }
             onGotTrackData(JSON.parse(body), track);
         }).on('data', function(data) {
             // decompressed data as it is received
@@ -165,7 +156,26 @@ function writeTrack(track) {
 }
 
 var sendMusicTo1self = function(trackName, trackmbid, trackDuration, trackUrl, artistName, albumName, listenDate, source) {
-    console.log(trackName + "Sent to 1self in stream ");
+    var dt = new Date();
+    dt.setTime(listenDate * 1000);
+    var musicEvent = {
+       "dateTime": dt.toISOString(),
+       "objectTags": ["music"],
+       "actionTags": ["listen"],
+       "properties": {
+           "track-duration" : trackDuration,
+           "track-name": trackName,
+           "track-mbid" : trackmbid,
+           "track-url" : trackUrl,
+           "artist-name" : artistName,
+           "album-name" : albumName,
+           "source" : source
+       }
+   };
+
+    console.log(config.stream);
+    console.log(musicEvent);
+    stream.send(musicEvent, function() {});
 };
 
 function onGotTrackData(data, passedThroughTrack) {

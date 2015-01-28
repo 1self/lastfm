@@ -15,8 +15,9 @@ angular.module('lastfmApp')
     	var postMessage = {};
     	postMessage.username = $scope.name;
     	console.log(postMessage);
-    	$http.post('/api/setup', postMessage).success(function(awesomeThings) {
+    	$http.post('/api/setup', postMessage).success(function(data) {
         	console.log('success');
+        	console.log(data);
     	});
     }
  });

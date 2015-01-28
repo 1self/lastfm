@@ -13,7 +13,7 @@ var Lib1selfserver = require('lib1self-server');
 exports.index = function(req, res) {
   console.log(req.body.username);
     var username = req.body.username;
-    if (username === undefined || username.length == 0) {
+    if (username === undefined || username.length === 0) {
         res.status(400).json({
         	status: "username is blank"
         });
@@ -28,14 +28,10 @@ exports.index = function(req, res) {
 
     res.setHeader("Content-Type", "application/json")
 
-    var auth = {
-		appId: "app-id-8aae965172e09b182bede2d71c2b7ebe",
-		appSecret: "app-secret-23e3afadea809f6697d19a8f1754e37df72522b310d57107d5ddb10bda821dd6"
-	}
-
 	var config = {
 		server: 'http://localhost:5000',
-		auth: auth,
+		appId: "app-id-8aae965172e09b182bede2d71c2b7ebe",
+		appSecret: "app-secret-23e3afadea809f6697d19a8f1754e37df72522b310d57107d5ddb10bda821dd6",
 		callbackUrl: callbackUrl
 	}
 

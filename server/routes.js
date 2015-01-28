@@ -10,7 +10,7 @@ module.exports = function(app) {
 
   // Insert routes below
   console.log('setting up routes');
-  app.use('/api/things', require('./api/thing'));
+  app.use('/api/sync', require('./api/sync'));
   app.use('/api/setup', require('./api/setup'));
   
   // All undefined asset or api routes should return a 404

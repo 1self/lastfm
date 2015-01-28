@@ -1,15 +1,16 @@
 <div ng-include="'components/navbar/navbar.html'"></div>
 
 <header class="hero-unit" id="banner">
-  <div class="container">
+  <div class="container"  ng-controller="MainCtrl">
     <h1>Martin's kickass lastfm integration</h1>
     <p class="lead">Grab your stats from last.fm!</p>
-    <form ng-submit="setupSync()" ng-controller="MainCtrl">
+    <form ng-submit="setupSync()">
       <div class="input-group">
       <span class="input-group-addon">User</span>
       <input type="text" ng-model="name" class="form-control"  placeholder="last.fm username">
       </div>
       </form>
+    <iframe ng-src="{{streamUrl}}" width="320px" height="700px"> </iframe>
   </div>
 </header>
 

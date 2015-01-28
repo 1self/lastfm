@@ -54,6 +54,8 @@ exports.index = function(req, res) {
 	        "status": "done",
 	        "barChart": barchartUrl,
 	        "jsonUrl": jsonUrl
-	    });					 	
+	    });
+
+	    stream.sync(function() {});
     });
 };

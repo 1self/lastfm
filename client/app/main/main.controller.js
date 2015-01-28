@@ -18,6 +18,7 @@ angular.module('lastfmApp')
     	$http.post('/api/setup', postMessage).success(function(data) {
         	console.log('success');
         	console.log(data);
+            $scope.streamUrl = data.barchatUrl;
     	});
     }
  });

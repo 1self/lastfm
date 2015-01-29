@@ -21,10 +21,10 @@ exports.index = function(req, res) {
         return;
     }
 
-    var callbackUrl = 'https://localhost:9001/api/sync?username='
+    var callbackUrl = 'http://localhost:9001/api/sync?username='
     					+ username
     					+ '&lastSyncDate={{lastSyncDate}}'
-    					+ '&streamId={{streamId}}';
+    					+ '&streamid={{streamid}}';
 
     res.setHeader("Content-Type", "application/json")
 
@@ -56,6 +56,9 @@ exports.index = function(req, res) {
 	        "jsonUrl": jsonUrl
 	    });
 
-	    stream.sync(function() {});
+	    stream.sync(function(error, response) {
+	    	console.log(error);
+	    	console.log(response);
+	    });
     });
 };

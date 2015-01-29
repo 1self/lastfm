@@ -21,14 +21,16 @@ config.server= 'http://localhost:5000';
 exports.index = function(req, res) {
     console.log(req.query);
 
+    console.log('lsd: ' + req.query.lastSyncDate);    
     var username = req.query.username;
     var lastSyncDate = req.query.lastSyncDate;
     var streamId = req.query.streamid;
     var writeToken = req.headers.authorization;
     
+    console.log('lsd: ' + lastSyncDate);    
 
     res.setHeader("Content-Type", "application/json")
-    var stream = lib1self.loadStream(config, streamId, writeToken, null);
+    var stream = lib1self.loadStream(config, streamId, writeToken, null, lastSyncDate);
     var eventStart = {
         objectTags: [ '1self', 'integration', 'lastfm']
         , actionTags: [ 'sync', 'start' ]
@@ -70,7 +72,7 @@ function getRecentTracks(username, pageNum, res, stream, lastSyncDate) {
         // body is the decompressed response body
         console.log('server encoded the data as: ' + (response.headers['content-encoding'] || 'identity'));
         console.log(stream);
-        onGotArtistTrackData(JSON.parse(body), stream);
+        onGotArtistTrackData(JSON.parse(body), stream, res, lastSyncDate);
         res.send(200);
     }).on('data', function(data) {
         // decompressed data as it is received
@@ -85,7 +87,7 @@ function getRecentTracks(username, pageNum, res, stream, lastSyncDate) {
         })
 }
 
-function onGotArtistTrackData(data, stream) {
+function onGotArtistTrackData(data, stream, res, lastSyncDate) {
     if (data.recenttracks && data.recenttracks.track) {
         // console.log('artist tracks here');
         // console.log(data);
@@ -103,7 +105,7 @@ function onGotArtistTrackData(data, stream) {
         if (data.recenttracks["@attr"].totalPages > data.recenttracks["@attr"].page) {
             var nextPage = data.recenttracks["@attr"].page;
             nextPage++;
-            getRecentTracks(data.recenttracks["@attr"].user, nextPage);
+            getRecentTracks(data.recenttracks["@attr"].user, nextPage, res, stream, lastSyncDate);
         }
     }
 }

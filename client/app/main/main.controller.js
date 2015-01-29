@@ -1,7 +1,7 @@
 'use strict';
 
 angular.module('lastfmApp')
-  .controller('MainCtrl', function ($scope, $http) {
+  .controller('MainCtrl', function ($scope, $sce, $http) {
     // $scope.awesomeThings = [];
    // console.log('click'); 
 
@@ -18,7 +18,8 @@ angular.module('lastfmApp')
     	$http.post('/api/setup', postMessage).success(function(data) {
         	console.log('success');
         	console.log(data);
-            $scope.streamUrl = data.barchatUrl;
+            $scope.streamUrl = $sce.trustAsResourceUrl(data.barChart);
+            $scope.jsonUrl = $sce.trustAsResourceUrl(data.jsonUrl);
     	});
     }
  });

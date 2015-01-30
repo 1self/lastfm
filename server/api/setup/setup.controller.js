@@ -29,13 +29,14 @@ exports.index = function(req, res) {
     res.setHeader("Content-Type", "application/json")
 
 	var config = {
-		server: 'http://localhost:5000',
+		server: 'https://api-staging.1self.co',
 		appId: "app-id-8aae965172e09b182bede2d71c2b7ebe",
 		appSecret: "app-secret-23e3afadea809f6697d19a8f1754e37df72522b310d57107d5ddb10bda821dd6",
 		callbackUrl: callbackUrl
 	}
 
     Lib1selfserver.createStream(config, function(error, stream){
+    	console.log(stream);
     	var barchartUrl = stream.visualize()
     							.objectTags(["music"])
     							.actionTags(["listen"])
@@ -56,6 +57,7 @@ exports.index = function(req, res) {
 	        "jsonUrl": jsonUrl
 	    });
 
+		console.log(stream);
 	    stream.sync(function(error, response) {
 	    	console.log(error);
 	    	console.log(response);

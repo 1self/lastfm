@@ -16,7 +16,7 @@ var lib1self = require('lib1self-server');
 var failedTrackCount = 0;
 
 var config = {};
-config.server= 'http://localhost:5000';
+config.server= 'http://api-staging.1self.co';
 // Get list of things
 exports.index = function(req, res) {
     console.log(req.query);
@@ -44,6 +44,8 @@ exports.index = function(req, res) {
             console.log('error:' + error);
         }
 
+        console.log('sent:');
+        console.log(error);
         console.log(response);
         console.log(stream);
         getRecentTracks(username, 1, res, stream, lastSyncDate);
@@ -180,7 +182,10 @@ var sendMusicTo1self = function(trackName, trackmbid, trackDuration, trackUrl, a
 
     console.log(stream);
     console.log(musicEvent);
-    stream.send(musicEvent, function() {});
+    stream.send(musicEvent, function(error, response) {
+        console.log('error: ' + error);
+        console.log('response: ' + response)
+    });
 };
 
 function onGotTrackData(data, passedThroughTrack, stream) {

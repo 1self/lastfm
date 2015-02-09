@@ -18,16 +18,14 @@ var failedTrackCount = 0;
 var config = {};
 config.server= 'http://api-staging.1self.co';
 // Get list of things
-exports.index = function(req, res) {
+exports.index = function (req, res) {
     console.log(req.query);
 
-    console.log('lsd: ' + req.query.lastSyncDate);    
+    console.log('lsd: ' + req.query.lastSyncDate);
     var username = req.query.username;
     var lastSyncDate = req.query.lastSyncDate;
     var streamId = req.query.streamid;
     var writeToken = req.headers.authorization;
-    
-    console.log('lsd: ' + lastSyncDate);    
 
     res.setHeader("Content-Type", "application/json")
     var stream = lib1self.loadStream(config, streamId, writeToken, null, lastSyncDate);
@@ -37,10 +35,10 @@ exports.index = function(req, res) {
         , properties: {
             lastSyncDate: config.lastSyncDate
         }
-    }
+    };
     console.log('stream is: ' + stream);
-    stream.send(eventStart, function(error, response){
-        if(error !== undefined){
+    stream.send(eventStart, function (error, response) {
+        if (error !== undefined) {
             console.log('error:' + error);
         }
 
@@ -57,7 +55,7 @@ function getRecentTracks(username, pageNum, res, stream, lastSyncDate) {
     url += "&page=" + pageNum;
     url += "&user=" + username;
 
-    if (lastSyncDate !== undefined){
+    if (lastSyncDate !== undefined) {
 
         var unixTimeStamp = Date.parse(lastSyncDate) / 1000;
         console.log(unixTimeStamp);
@@ -70,19 +68,23 @@ function getRecentTracks(username, pageNum, res, stream, lastSyncDate) {
         method: 'GET',
         uri: url,
         gzip: true
-    }, function(error, response, body) {
+    }, function (error, response, body) {
         // body is the decompressed response body
         console.log('server encoded the data as: ' + (response.headers['content-encoding'] || 'identity'));
         console.log(stream);
         onGotArtistTrackData(JSON.parse(body), stream, res, lastSyncDate);
-        res.send(200);
-    }).on('data', function(data) {
+        console.log("Error: ", error);
+        console.log("Response: ", res);
+        if(!res.finished){
+            res.send(200);
+        }
+    }).on('data', function (data) {
         // decompressed data as it is received
         console.log('decoded chunk: ');
     })
-        .on('response', function(response) {
+        .on('response', function (response) {
             // unmodified http.IncomingMessage object
-            response.on('data', function(data) {
+            response.on('data', function (data) {
                 // compressed data as it is received
                 console.log('received ' + data.length + ' bytes of compressed data')
             })
@@ -136,20 +138,20 @@ function writeTrack(track, stream) {
             method: 'GET',
             uri: url,
             gzip: true
-        }, function(error, response, body) {
+        }, function (error, response, body) {
             console.log("onGotTrackData called");
             console.log(body);
-            if(body === undefined){
+            if (body === undefined) {
                 console.log("error reading track");
             }
             onGotTrackData(JSON.parse(body), track, stream);
-        }).on('data', function(data) {
+        }).on('data', function (data) {
             // decompressed data as it is received
             console.log('decoded chunk: ');
         })
-            .on('response', function(response) {
+            .on('response', function (response) {
                 // unmodified http.IncomingMessage object
-                response.on('data', function(data) {
+                response.on('data', function (data) {
                     // compressed data as it is received
                     console.log('received ' + data.length + ' bytes of compressed track data')
                 })
@@ -160,29 +162,29 @@ function writeTrack(track, stream) {
     }
 }
 
-var sendMusicTo1self = function(trackName, trackmbid, trackDuration, trackUrl, artistName, albumName, listenDate, source, stream) {
+var sendMusicTo1self = function (trackName, trackmbid, trackDuration, trackUrl, artistName, albumName, listenDate, source, stream) {
     console.log('send to 1s: ');
     console.log(stream);
     var dt = new Date();
     dt.setTime(listenDate * 1000);
     var musicEvent = {
-       "dateTime": dt.toISOString(),
-       "objectTags": ["music"],
-       "actionTags": ["listen"],
-       "properties": {
-           "track-duration" : trackDuration,
-           "track-name": trackName,
-           "track-mbid" : trackmbid,
-           "track-url" : trackUrl,
-           "artist-name" : artistName,
-           "album-name" : albumName,
-           "source" : source
-       }
-   };
+        "dateTime": dt.toISOString(),
+        "objectTags": ["music"],
+        "actionTags": ["listen"],
+        "properties": {
+            "track-duration": trackDuration,
+            "track-name": trackName,
+            "track-mbid": trackmbid,
+            "track-url": trackUrl,
+            "artist-name": artistName,
+            "album-name": albumName,
+            "source": source
+        }
+    };
 
     console.log(stream);
     console.log(musicEvent);
-    stream.send(musicEvent, function(error, response) {
+    stream.send(musicEvent, function (error, response) {
         console.log('error: ' + error);
         console.log('response: ' + response)
     });

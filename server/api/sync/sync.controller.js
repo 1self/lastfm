@@ -26,13 +26,14 @@ exports.index = function (req, res) {
     var lastSyncDate = req.query.lastSyncDate;
     var streamId = req.query.streamid;
     var writeToken = req.headers.authorization;
+    var callbackUrl = 'http://localhost:9001/api/sync?username=' + username
+        + '&lastSyncDate' + lastSyncDate
+        + '&streamid' + streamId;
 
-    res.setHeader("Content-Type", "application/json")
-    var stream = lib1self.loadStream(config, streamId, writeToken, null, lastSyncDate);
+    res.setHeader("Content-Type", "application/json");
+    var stream = lib1self.loadStream(config, streamId, writeToken, null, callbackUrl, lastSyncDate);
     var eventStart = {
-        objectTags: [ '1self', 'integration', 'lastfm']
-        , actionTags: [ 'sync', 'start' ]
-        , properties: {
+        objectTags: [ '1self', 'integration', 'lastfm'], actionTags: [ 'sync', 'start' ], properties: {
             lastSyncDate: config.lastSyncDate
         }
     };
@@ -75,7 +76,7 @@ function getRecentTracks(username, pageNum, res, stream, lastSyncDate) {
         onGotArtistTrackData(JSON.parse(body), stream, res, lastSyncDate);
         console.log("Error: ", error);
         console.log("Response: ", res);
-        if(!res.finished){
+        if (!res.finished) {
             res.send(200);
         }
     }).on('data', function (data) {
@@ -144,7 +145,9 @@ function writeTrack(track, stream) {
             if (body === undefined) {
                 console.log("error reading track");
             }
-            onGotTrackData(JSON.parse(body), track, stream);
+            else{
+                onGotTrackData(JSON.parse(body), track, stream);
+            }
         }).on('data', function (data) {
             // decompressed data as it is received
             console.log('decoded chunk: ');

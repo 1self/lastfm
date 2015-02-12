@@ -16,7 +16,6 @@ exports.index = function (req, res) {
         return _.range(totalPages, 0, -1);
     };
     var fetchRecentTracks = function (pagesToBeFetched) {
-        var recentTracksInfo = [];
         var fetchRecentTracksPerPage = function (chain, recentTracksPromise) {
             return chain
                 .then(function () {
@@ -24,7 +23,7 @@ exports.index = function (req, res) {
                 })
                 .then(function (recentTracks) {
                     return recentTracks.reverse().map(function (recentTrack) {
-                        var recentTrackInfo = {
+                        return {
                             mbid: recentTrack.mbid,
                             artistName: recentTrack.artist['#text'],
                             name: recentTrack.name,
@@ -32,8 +31,15 @@ exports.index = function (req, res) {
                             albumName: recentTrack.album['#text'],
                             date: recentTrack.date
                         };
-                        recentTracksInfo.push(recentTrackInfo);
                     });
+                })
+                .then(fetchAdditionalTrackInfo)
+                .then(create1SelfEvents)
+                .then(sendEventsTo1self)
+                .then(function (body) {
+                    console.log("Events sent to 1self successfully!")
+                }, function (error) {
+                    console.log("Error: ", error);
                 });
         };
         return pagesToBeFetched
@@ -41,36 +47,79 @@ exports.index = function (req, res) {
                 return getRecentTracksForUser(username, page);
             })
             .reduce(fetchRecentTracksPerPage, q.resolve())
+    };
+    var fetchAdditionalTrackInfo = function (recentTracksInfo) {
+        var getAdditionalTrackInfoFor = function (recentTrack) {
+            var deferred = q.defer();
+            getTrackDuration(recentTrack).then(function (trackDuration) {
+                recentTrack.trackDuration = trackDuration;
+                deferred.resolve(recentTrack);
+            });
+            return deferred.promise;
+        };
+        return recentTracksInfo
+            .map(getAdditionalTrackInfoFor)
+            .reduce(function (chain, recentTrackPromise) {
+                return chain
+                    .then(function () {
+                        return recentTrackPromise;
+                    })
+                    .then(function (recentTrack) {
+                        return recentTrack;
+                    })
+            }, q.resolve())
             .then(function () {
                 return recentTracksInfo;
-            });
+            })
     };
-
+    var create1SelfEvents = function (recentTracksInfo) {
+        return recentTracksInfo.map(function (recentTrackInfo) {
+            var dt = new Date();
+            var listenDate = recentTrackInfo.date.uts;
+            dt.setTime(listenDate * 1000);
+            return {
+                "dateTime": dt.toISOString(),
+                "objectTags": ["music"],
+                "actionTags": ["listen"],
+                "properties": {
+                    "track-duration": recentTrackInfo.trackDuration,
+                    "track-name": recentTrackInfo.name,
+                    "track-mbid": recentTrackInfo.mbid,
+                    "track-url": recentTrackInfo.trackUrl,
+                    "artist-name": recentTrackInfo.artistName,
+                    "album-name": recentTrackInfo.albumName,
+                    "source": "last.fm"
+                }
+            };
+        });
+    };
+    var sendEventsTo1self = function (events) {
+        var deferred = q.defer();
+        request({
+            method: 'POST',
+            uri: config.server + '/v1/streams/' + streamId + '/events/batch',
+            gzip: true,
+            headers: {
+                'Authorization': writeToken,
+                'Content-type': 'application/json'
+            },
+            json: true,
+            body: events
+        }, function (err, response, body) {
+            if (err) {
+                deferred.reject(err);
+            }
+            if (response.statusCode === 404) {
+                deferred.reject("Stream Not Found!")
+            }
+            deferred.resolve(body);
+        });
+        return deferred.promise;
+    };
     numberOfPagesToFetch(username)
         .then(createPagesToFetch)
         .then(fetchRecentTracks)
-        .then(function (recentTracksInfo) {
-//            console.log("rencet trackers " + JSON.stringify(recentTracksInfo))
-            return recentTracksInfo
-                .map(function (recentTrack) {
-                    var deferred = q.defer();
-                    getTrackDuration(recentTrack).then(function (duration) {
-                        console.log("track duration : " + duration);
-                        recentTrack.duration = duration;
-                        deferred.resolve(recentTrack);
-                    });
-                    return deferred.promise;
-                })
-                .reduce(function (chain, recentTrackPromise) {
-                    return chain
-                        .then(function () {
-                            return recentTrackPromise;
-                        })
-                        .then(function (recentTrack) {
-                            console.log("recentTrack :" + JSON.stringify(recentTrack));
-                        })
-                })
-        });
+
 };
 
 var numberOfPagesToFetch = function (username) {
@@ -120,7 +169,6 @@ var getTrackDuration = function (track) {
         url += "&artist=" + track.artistName;
         url += "&track=" + track.name;
     }
-    console.log("url " + url);
     request({
         method: 'GET',
         uri: url,

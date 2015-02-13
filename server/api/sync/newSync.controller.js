@@ -1,6 +1,7 @@
 'use strict';
 var _ = require('lodash');
-var request = require('request');
+var limit = require("simple-rate-limiter");
+var request = limit(require("request")).to(5).per(1000);
 var lib1self = require('lib1self-server');
 var q = require('q');
 
@@ -119,14 +120,20 @@ exports.index = function (req, res) {
     numberOfPagesToFetch(username)
         .then(createPagesToFetch)
         .then(fetchRecentTracks)
-
+        .then(function () {
+            res.send(200);
+        })
 };
 
-var numberOfPagesToFetch = function (username) {
+var numberOfPagesToFetch = function (username, lastSyncDate) {
     var deferred = q.defer();
     var limit = 200;
-    var url = "http://ws.audioscrobbler.com/2.0/?method=user.getInfo&api_key=0900562e22abd0500f0432147482cfc1&format=json&limit=" + limit;
+    var url = "http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&api_key=0900562e22abd0500f0432147482cfc1&format=json&limit=200";
     url += "&user=" + username;
+    if (lastSyncDate !== undefined) {
+        var unixTimeStamp = Date.parse(lastSyncDate) / 1000;
+        url += "&from=" + unixTimeStamp;
+    }
     request({
         method: 'GET',
         uri: url,
@@ -135,9 +142,8 @@ var numberOfPagesToFetch = function (username) {
         if (error) {
             deferred.reject(error);
         }
-        var userInfo = JSON.parse(body);
-        var totalPlayCount = userInfo.user.playcount;
-        var totalPages = Math.ceil(totalPlayCount / limit);
+        var data = JSON.parse(body);
+        var totalPages = data.recenttracks["@attr"].totalPages;
         deferred.resolve(totalPages);
     });
     return deferred.promise;
@@ -155,7 +161,16 @@ var getRecentTracksForUser = function (username, pageNum) {
         gzip: true
     }, function (error, response, body) {
         var recentTrackData = JSON.parse(body);
-        deferred.resolve(recentTrackData.recenttracks.track);
+        if (recentTrackData.recenttracks === undefined) {
+           console.log("Couldn't fetch the events");
+           console.log("Url: ", url);
+            deferred.resolve([]);
+        }
+        else{
+            console.log("Fetched events for:");
+            console.log("Url: ", url);
+            deferred.resolve(recentTrackData.recenttracks.track);
+        }
     });
     return deferred.promise;
 };

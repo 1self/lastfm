@@ -1,52 +1,97 @@
-/**
- * Using Rails-like standard naming convention for endpoints.
- * GET     /things              ->  index
- * POST    /things              ->  create
- * GET     /things/:id          ->  show
- * PUT     /things/:id          ->  update
- * DELETE  /things/:id          ->  destroy
- */
-
 'use strict';
-
 var _ = require('lodash');
-var request = require('request');
+var limit = require("simple-rate-limiter");
+var request = limit(require("request")).to(5).per(1000);
 var lib1self = require('lib1self-server');
-
-var failedTrackCount = 0;
+var q = require('q');
 
 var config = {};
-config.server= 'http://api-staging.1self.co';
-// Get list of things
+//config.server = 'http://localhost:5000';
+config.server = 'https://api-staging.1self.co';
+
 exports.index = function (req, res) {
     var username = req.query.username;
-    var lastSyncDate = req.query.lastSyncDate;
+    var lastSyncDate = req.query.latestEventSyncDate;
     var streamId = req.query.streamid;
     var writeToken = req.headers.authorization;
-    var callbackUrl = 'http://localhost:9001/api/sync?username=' + username
-        + '&lastSyncDate' + lastSyncDate
-        + '&streamid' + streamId;
-
-    res.setHeader("Content-Type", "application/json");
-    var stream = lib1self.loadStream(config, streamId, writeToken, null, callbackUrl, lastSyncDate);
-    var eventStart = {
-        objectTags: [ '1self', 'integration', 'lastfm'], actionTags: [ 'sync', 'start' ], properties: {
-            lastSyncDate: config.lastSyncDate
-        }
+    var createPagesToFetch = function (totalPages) {
+        return _.range(1, totalPages + 1);
     };
-    stream.send(eventStart, function (error, response) {
-        if (error !== undefined) {
-            console.log('error:' + error);
-        }
-        getRecentTracks(username, 1, res, stream, lastSyncDate);
-    })
+    var create1SelfEvents = function (recentTracksInfo) {
+        return recentTracksInfo.map(function (recentTrackInfo) {
+            var dt = new Date();
+            var listenDate = recentTrackInfo.date.uts;
+            dt.setTime(listenDate * 1000);
+            return {
+                "dateTime": dt.toISOString(),
+                "objectTags": ["music"],
+                "actionTags": ["listen"],
+                "properties": {
+                    "track-name": recentTrackInfo.name,
+                    "track-mbid": recentTrackInfo.mbid,
+                    "track-url": recentTrackInfo.trackUrl,
+                    "artist-name": recentTrackInfo.artistName,
+                    "album-name": recentTrackInfo.albumName,
+                    "source": "last.fm"
+                }
+            };
+        });
+    };
+    var sendEventsTo1self = function (events) {
+        var deferred = q.defer();
+        request({
+            method: 'POST',
+            uri: config.server + '/v1/streams/' + streamId + '/events/batch',
+            gzip: true,
+            headers: {
+                'Authorization': writeToken,
+                'Content-type': 'application/json'
+            },
+            json: true,
+            body: events
+        }, function (err, response, body) {
+            if (err) {
+                deferred.reject(err);
+            }
+            if (response.statusCode === 404) {
+                deferred.reject("Stream Not Found!")
+            }
+            deferred.resolve(body);
+        });
+        return deferred.promise;
+    };
+    var fetchRecentTracks = function (pagesToBeFetched) {
+        console.log("Pages To be fetched: ", pagesToBeFetched);
+        return pagesToBeFetched
+            .reduce(function (chain, page) {
+                return chain
+                    .then(function () {
+                        console.log("Fetching the page: ", page);
+                        return getRecentTracksForUser(username, page)
+                    })
+                    .then(create1SelfEvents)
+                    .then(sendEventsTo1self)
+                    .then(function (body) {
+                        console.log("Events sent to 1self successfully! For page: ", page);
+                    }, function (error) {
+                        console.log("Error: ", error);
+                    });
+            }, q.resolve());
+
+    };
+    numberOfPagesToFetch(username, lastSyncDate)
+        .then(createPagesToFetch)
+        .then(fetchRecentTracks)
+        .then(function () {
+            res.send(200);
+        })
 };
 
-function getRecentTracks(username, pageNum, res, stream, lastSyncDate) {
+var numberOfPagesToFetch = function (username, lastSyncDate) {
+    var deferred = q.defer();
+    var limit = 200;
     var url = "http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&api_key=0900562e22abd0500f0432147482cfc1&format=json&limit=200";
-    url += "&page=" + pageNum;
     url += "&user=" + username;
-
     if (lastSyncDate !== undefined) {
         var unixTimeStamp = Date.parse(lastSyncDate) / 1000;
         url += "&from=" + unixTimeStamp;
@@ -56,94 +101,36 @@ function getRecentTracks(username, pageNum, res, stream, lastSyncDate) {
         uri: url,
         gzip: true
     }, function (error, response, body) {
-        onGotArtistTrackData(JSON.parse(body), stream, res, lastSyncDate);
-        if (!res.finished) {
-            res.send(200);
+        if (error) {
+            deferred.reject(error);
         }
-    })
-}
-
-function onGotArtistTrackData(data, stream, res, lastSyncDate) {
-    if (data.recenttracks && data.recenttracks.track) {
-        if (data.recenttracks.track.length) {
-            for (var i = 0; i < data.recenttracks.track.length; i++) {
-                writeTrack(data.recenttracks.track[i], stream);
-            }
-        } else {
-            writeTrack(data.recenttracks.track, stream);
-        }
-    }
-    if (data.recenttracks && data.recenttracks["@attr"]) {
-        if (data.recenttracks["@attr"].totalPages > data.recenttracks["@attr"].page) {
-            var nextPage = data.recenttracks["@attr"].page;
-            nextPage++;
-            getRecentTracks(data.recenttracks["@attr"].user, nextPage, res, stream, lastSyncDate);
-        }
-    }
-}
-
-function writeTrack(track, stream) {
-    if (track.date) {
-        var dt = new Date();
-        dt.setTime(track.date.uts * 1000);
-        var url = "http://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=0900562e22abd0500f0432147482cfc1&format=json";
-        if (track.mbid && track.mbid !== "") {
-            url += "&mbid=" + track.mbid;
-        } else {
-            url += "&artist=" + track.artist['#text'];
-            url += "&track=" + track.name;
-        }
-        request({
-            method: 'GET',
-            uri: url,
-            gzip: true
-        }, function (error, response, body) {
-            if (body !== undefined) {
-                onGotTrackData(JSON.parse(body), track, stream);
-            }
-        })
-    }
-}
-
-var sendMusicTo1self = function (trackName, trackmbid, trackDuration, trackUrl, artistName, albumName, listenDate, source, stream) {
-    var dt = new Date();
-    dt.setTime(listenDate * 1000);
-    var musicEvent = {
-        "dateTime": dt.toISOString(),
-        "objectTags": ["music"],
-        "actionTags": ["listen"],
-        "properties": {
-            "track-duration": trackDuration,
-            "track-name": trackName,
-            "track-mbid": trackmbid,
-            "track-url": trackUrl,
-            "artist-name": artistName,
-            "album-name": albumName,
-            "source": source
-        }
-    };
-    stream.send(musicEvent, function (error, response) {
+        var data = JSON.parse(body);
+        var totalPages = data.recenttracks["@attr"].totalPages;
+        deferred.resolve(parseInt(totalPages));
     });
+    return deferred.promise;
 };
 
-function onGotTrackData(data, passedThroughTrack, stream) {
-    var html = '';
-    var track = data.track;
-    var listenDate = passedThroughTrack.date.uts;
-    if (track) {
-        var dt = new Date();
-        dt.setTime(listenDate * 1000);
-        var artistName = "unknown";
-        var albumTitle = "unknown";
-        if (track.artist) {
-            artistName = track.artist.name;
-        }
-        if (track.album) {
-            albumTitle = track.album.title;
-        }
-        sendMusicTo1self(track.name, track.mbid, track.duration, track.url, artistName, albumTitle, listenDate, "last.fm", stream);
-    } else {
-        failedTrackCount++;
-    }
-}
+var getRecentTracksForUser = function (username, pageNum) {
+    var deferred = q.defer();
+    var url = "http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&api_key=0900562e22abd0500f0432147482cfc1&format=json&limit=200";
+    url += "&page=" + pageNum;
+    url += "&user=" + username;
 
+    request({
+        method: 'GET',
+        uri: url,
+        gzip: true
+    }, function (error, response, body) {
+        var recentTrackData = JSON.parse(body);
+        if (recentTrackData.error) {
+            console.log("Couldn't fetch the events");
+            console.log("Url: ", url);
+            deferred.reject(recentTrackData.error);
+        }
+        else {
+            deferred.resolve(recentTrackData.recenttracks.track);
+        }
+    });
+    return deferred.promise;
+};

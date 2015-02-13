@@ -23,7 +23,7 @@ exports.index = function(req, res) {
 
     var callbackUrl = 'http://localhost:9001/api/sync?username='
     					+ username
-    					+ '&lastSyncDate={{lastSyncDate}}'
+    					+ '&latestEventSyncDate={{latestEventSyncDate}}'
     					+ '&streamid={{streamid}}';
 
     res.setHeader("Content-Type", "application/json")
@@ -33,7 +33,7 @@ exports.index = function(req, res) {
 		appId: "app-id-8aae965172e09b182bede2d71c2b7ebe",
 		appSecret: "app-secret-23e3afadea809f6697d19a8f1754e37df72522b310d57107d5ddb10bda821dd6",
 		callbackUrl: callbackUrl
-	}
+	};
 
     Lib1selfserver.createStream(config, function(error, stream){
     	console.log(stream);
@@ -42,14 +42,14 @@ exports.index = function(req, res) {
     							.actionTags(["listen"])
     							.count()
     							.barChart()
-    							.url()
+    							.url();
 
     	var jsonUrl = stream.visualize()
     							.objectTags(["music"])
     							.actionTags(["listen"])
     							.count()
     							.json()
-    							.url()
+    							.url();
 
 		res.json({
 	        "status": "done",

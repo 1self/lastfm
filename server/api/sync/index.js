@@ -1,7 +1,7 @@
 'use strict';
 
 var express = require('express');
-var controller = require('./newSync.controller');
+var controller = require('./sync.controller');
 
 var router = express.Router();
 

@@ -14,64 +14,7 @@ exports.index = function (req, res) {
     var streamId = req.query.streamid;
     var writeToken = req.headers.authorization;
     var createPagesToFetch = function (totalPages) {
-        return _.range(totalPages, 0, -1);
-    };
-    var fetchRecentTracks = function (pagesToBeFetched) {
-        var fetchRecentTracksPerPage = function (chain, recentTracksPromise) {
-            return chain
-                .then(function () {
-                    return recentTracksPromise;
-                })
-                .then(function (recentTracks) {
-                    return recentTracks.reverse().map(function (recentTrack) {
-                        return {
-                            mbid: recentTrack.mbid,
-                            artistName: recentTrack.artist['#text'],
-                            name: recentTrack.name,
-                            trackUrl: recentTrack.url,
-                            albumName: recentTrack.album['#text'],
-                            date: recentTrack.date
-                        };
-                    });
-                })
-                .then(fetchAdditionalTrackInfo)
-                .then(create1SelfEvents)
-                .then(sendEventsTo1self)
-                .then(function (body) {
-                    console.log("Events sent to 1self successfully!")
-                }, function (error) {
-                    console.log("Error: ", error);
-                });
-        };
-        return pagesToBeFetched
-            .map(function (page) {
-                return getRecentTracksForUser(username, page);
-            })
-            .reduce(fetchRecentTracksPerPage, q.resolve())
-    };
-    var fetchAdditionalTrackInfo = function (recentTracksInfo) {
-        var getAdditionalTrackInfoFor = function (recentTrack) {
-            var deferred = q.defer();
-            getTrackDuration(recentTrack).then(function (trackDuration) {
-                recentTrack.trackDuration = trackDuration;
-                deferred.resolve(recentTrack);
-            });
-            return deferred.promise;
-        };
-        return recentTracksInfo
-            .map(getAdditionalTrackInfoFor)
-            .reduce(function (chain, recentTrackPromise) {
-                return chain
-                    .then(function () {
-                        return recentTrackPromise;
-                    })
-                    .then(function (recentTrack) {
-                        return recentTrack;
-                    })
-            }, q.resolve())
-            .then(function () {
-                return recentTracksInfo;
-            })
+        return _.range(1, totalPages + 1);
     };
     var create1SelfEvents = function (recentTracksInfo) {
         return recentTracksInfo.map(function (recentTrackInfo) {
@@ -83,7 +26,6 @@ exports.index = function (req, res) {
                 "objectTags": ["music"],
                 "actionTags": ["listen"],
                 "properties": {
-                    "track-duration": recentTrackInfo.trackDuration,
                     "track-name": recentTrackInfo.name,
                     "track-mbid": recentTrackInfo.mbid,
                     "track-url": recentTrackInfo.trackUrl,
@@ -117,7 +59,26 @@ exports.index = function (req, res) {
         });
         return deferred.promise;
     };
-    numberOfPagesToFetch(username)
+    var fetchRecentTracks = function (pagesToBeFetched) {
+        console.log("Pages To be fetched: ", pagesToBeFetched);
+        return pagesToBeFetched
+            .reduce(function (chain, page) {
+                return chain
+                    .then(function () {
+                        console.log("Fetching the page: ", page);
+                        return getRecentTracksForUser(username, page)
+                    })
+                    .then(create1SelfEvents)
+                    .then(sendEventsTo1self)
+                    .then(function (body) {
+                        console.log("Events sent to 1self successfully! For page: ", page);
+                    }, function (error) {
+                        console.log("Error: ", error);
+                    });
+            }, q.resolve());
+
+    };
+    numberOfPagesToFetch(username, lastSyncDate)
         .then(createPagesToFetch)
         .then(fetchRecentTracks)
         .then(function () {
@@ -144,7 +105,7 @@ var numberOfPagesToFetch = function (username, lastSyncDate) {
         }
         var data = JSON.parse(body);
         var totalPages = data.recenttracks["@attr"].totalPages;
-        deferred.resolve(totalPages);
+        deferred.resolve(parseInt(totalPages));
     });
     return deferred.promise;
 };
@@ -161,45 +122,14 @@ var getRecentTracksForUser = function (username, pageNum) {
         gzip: true
     }, function (error, response, body) {
         var recentTrackData = JSON.parse(body);
-        if (recentTrackData.recenttracks === undefined) {
-           console.log("Couldn't fetch the events");
-           console.log("Url: ", url);
-            deferred.resolve([]);
-        }
-        else{
-            console.log("Fetched events for:");
+        if (recentTrackData.error) {
+            console.log("Couldn't fetch the events");
             console.log("Url: ", url);
+            deferred.reject(recentTrackData.error);
+        }
+        else {
             deferred.resolve(recentTrackData.recenttracks.track);
         }
     });
     return deferred.promise;
 };
-
-var getTrackDuration = function (track) {
-    var deferred = q.defer();
-    var url = "http://ws.audioscrobbler.com/2.0/?method=track.getInfo&api_key=0900562e22abd0500f0432147482cfc1&format=json";
-    if (track.mbid && track.mbid !== "") {
-        url += "&mbid=" + track.mbid;
-    } else {
-        url += "&artist=" + track.artistName;
-        url += "&track=" + track.name;
-    }
-    request({
-        method: 'GET',
-        uri: url,
-        gzip: true
-    }, function (error, response, body) {
-        if (error) {
-            deferred.reject(error);
-        }
-        if (body !== undefined) {
-            var trackInfo = JSON.parse(body);
-            if (trackInfo.track && trackInfo.track.duration)
-                deferred.resolve(trackInfo.track.duration);
-            else
-                deferred.resolve("0");
-        }
-    });
-    return deferred.promise;
-};
-

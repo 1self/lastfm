@@ -29,9 +29,9 @@ exports.index = function (req, res) {
                 "properties": {
                     "track-name": recentTrackInfo.name,
                     "track-mbid": recentTrackInfo.mbid,
-                    "track-url": recentTrackInfo.trackUrl,
-                    "artist-name": recentTrackInfo.artistName,
-                    "album-name": recentTrackInfo.albumName,
+                    "track-url": recentTrackInfo.url,
+                    "artist-name": recentTrackInfo.artist["#text"],
+                    "album-name": recentTrackInfo.album["#text"],
                     "source": "last.fm"
                 }
             };
@@ -66,7 +66,6 @@ exports.index = function (req, res) {
             .reduce(function (chain, page) {
                 return chain
                     .then(function () {
-                        console.log("Fetching the page: ", page);
                         return getRecentTracksForUser(username, page)
                     })
                     .then(create1SelfEvents)

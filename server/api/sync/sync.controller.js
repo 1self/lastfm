@@ -9,7 +9,7 @@ config.server = 'http://localhost:5000';
 
 exports.index = function (req, res) {
     var username = req.query.username;
-    var lastSyncDate = req.query.latestEventSyncDate;
+    var lastSyncDate = req.query.latestSyncField;
     var streamId = req.query.streamid;
     var writeToken = req.headers.authorization;
     var createPagesToFetch = function (totalPages) {
@@ -31,7 +31,10 @@ exports.index = function (req, res) {
                     "artist-name": recentTrackInfo.artist["#text"],
                     "album-name": recentTrackInfo.album["#text"],
                     "source": "last.fm"
-                }
+                },
+              "latestSyncField": {
+                "$date": dt.toISOString()
+              }
             };
         });
     };

@@ -16,7 +16,7 @@ exports.index = function (req, res) {
 
     var callbackUrl = 'http://localhost:9001/api/sync?username='
         + username
-        + '&latestEventSyncDate={{latestEventSyncDate}}'
+        + '&latestSyncField={{latestSyncField}}'
         + '&streamid={{streamid}}';
 
     /*	var config = {

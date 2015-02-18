@@ -6,8 +6,8 @@ var lib1self = require('lib1self-server');
 var q = require('q');
 
 var config = {};
-//config.server = 'http://localhost:5000';
-config.server = 'https://api-staging.1self.co';
+config.server = 'http://localhost:5000';
+//config.server = 'https://api-staging.1self.co';
 
 exports.index = function (req, res) {
     var username = req.query.username;
@@ -78,11 +78,64 @@ exports.index = function (req, res) {
             }, q.resolve());
 
     };
-    numberOfPagesToFetch(username, lastSyncDate)
+    var createSyncStartEvent = function () {
+        return {
+            "dateTime": new Date().toISOString(),
+            "objectTags": ["sync"],
+            "actionTags": ["start"],
+            "properties": {
+                "source": "last.fm"
+            }
+        };
+    };
+    var createSyncCompleteEvent = function () {
+        return {
+            "dateTime": new Date().toISOString(),
+            "objectTags": ["sync"],
+            "actionTags": ["complete"],
+            "properties": {
+                "source": "last.fm"
+            }
+        };
+    };
+    var send1SelfSyncEvent = function (event) {
+        var deferred = q.defer();
+        request({
+            method: 'POST',
+            uri: config.server + '/v1/streams/' + streamId + '/events',
+            gzip: true,
+            headers: {
+                'Authorization': writeToken,
+                'Content-type': 'application/json'
+            },
+            json: true,
+            body: event
+        }, function (err, response, body) {
+            if (err) {
+                deferred.reject(err);
+            }
+            if (response.statusCode === 404) {
+                deferred.reject("Stream Not Found!")
+            }
+            deferred.resolve(body);
+        });
+        return deferred.promise;
+    };
+    var syncStartEvent = createSyncStartEvent();
+    send1SelfSyncEvent(syncStartEvent)
+        .then(function () {
+            console.log("Sync Started!!!");
+            return numberOfPagesToFetch(username, lastSyncDate)
+        })
         .then(createPagesToFetch)
         .then(fetchRecentTracks)
         .then(function () {
-            res.send(200);
+            console.log("Sync Complete!!!");
+            var syncCompleteEvent = createSyncCompleteEvent();
+            return send1SelfSyncEvent(syncCompleteEvent);
+        })
+        .then(function () {
+            res.status(200).send("Synced all the events");
         })
 };
 

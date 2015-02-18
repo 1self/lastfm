@@ -1,8 +1,6 @@
 'use strict';
 var _ = require('lodash');
-var limit = require("simple-rate-limiter");
-var request = limit(require("request")).to(5).per(1000);
-var lib1self = require('lib1self-server');
+var request = require("request");
 var q = require('q');
 
 var config = {};

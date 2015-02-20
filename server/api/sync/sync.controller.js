@@ -4,7 +4,7 @@ var request = require("request");
 var q = require('q');
 
 var config = {};
-config.server = 'http://localhost:5000';
+config.server = process.env.ONESELF_HOST;
 //config.server = 'https://api-staging.1self.co';
 
 exports.index = function (req, res) {
@@ -62,7 +62,7 @@ exports.index = function (req, res) {
         return deferred.promise;
     };
     var fetchRecentTracks = function (pagesToBeFetched) {
-        console.log("Pages To be fetched: ", pagesToBeFetched);
+        //console.log("Pages To be fetched: ", pagesToBeFetched);
         return pagesToBeFetched
             .reduce(function (chain, page) {
                 return chain

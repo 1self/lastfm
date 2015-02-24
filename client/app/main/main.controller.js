@@ -5,7 +5,8 @@ angular.module('lastfmApp')
         $scope.setupSync = function () {
             var postMessage = {};
             postMessage.username = $scope.name;
-            postMessage.token = $location.search().token;
+            postMessage.oneselfUsername = $location.search().username;
+            postMessage.registrationToken = $location.search().token;
             console.log(postMessage);
             $http.post('/api/setup', postMessage)
                 .success(function (data) {

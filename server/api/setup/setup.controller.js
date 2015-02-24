@@ -85,20 +85,16 @@ exports.index = function (req, res) {
     });
     return deferred.promise;
   };
-
   if (registrationToken === undefined || username === undefined) {
-    res.status(200).json({"redirectUrl": "http://localhost:5000/dashboard"})
+    res.status(200).send();
   }
   else {
     createStream(oneselfUsername, registrationToken)
       .then(function (stream) {
         sync(stream);
-        res.status(200).json({
-          "redirectUrl": "http://localhost:5000/dashboard?streamId="
-          + stream.streamid + "&readToken=" + stream.readToken
-        });
+        res.status(200).send();
       }).catch(function (error) {
-        res.status(200).json({"redirectUrl": "http://localhost:5000/dashboard"})
+        res.status(200).send();
       });
   }
 };

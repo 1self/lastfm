@@ -4,7 +4,6 @@ var request = require("request");
 var q = require('q');
 
 var config = {};
-//config.server = process.env.ONESELF_HOST;
 //config.server = 'https://api-staging.1self.co';
 config.server = "http://localhost:5000";
 

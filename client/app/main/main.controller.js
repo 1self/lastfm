@@ -10,7 +10,7 @@ angular.module('lastfmApp')
       console.log(postMessage);
       $http.post('/api/setup', postMessage)
         .success(function (data) {
-          window.location.href = "http://localhost:5000/dashboard";
+          window.location.href = "http://localhost:5000/integrations";
         })
         .error(function (err) {
           console.log('error : ' + err);

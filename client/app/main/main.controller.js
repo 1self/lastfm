@@ -11,6 +11,8 @@ angular.module('lastfmApp')
       $http.post('/api/setup', postMessage)
         .success(function (data) {
           window.location.href = "http://localhost:5000/integrations";
+          //window.location.href = "https://app-staging.1self.co/integrations";
+          //window.location.href = "https://app.1self.co/integrations";
         })
         .error(function (err) {
           console.log('error : ' + err);

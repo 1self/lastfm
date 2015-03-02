@@ -2,10 +2,7 @@
 var _ = require('lodash');
 var request = require("request");
 var q = require('q');
-
-var config = {};
-//config.server = 'https://api-staging.1self.co';
-config.server = "http://localhost:5000";
+var ONESELF_HOST = process.env.ONESELF_HOST;
 
 exports.index = function (req, res) {
   var username = req.query.username;
@@ -42,7 +39,7 @@ exports.index = function (req, res) {
     var deferred = q.defer();
     request({
       method: 'POST',
-      uri: config.server + '/v1/streams/' + streamId + '/events/batch',
+      uri: ONESELF_HOST + '/v1/streams/' + streamId + '/events/batch',
       gzip: true,
       headers: {
         'Authorization': writeToken,
@@ -103,7 +100,7 @@ exports.index = function (req, res) {
     var deferred = q.defer();
     request({
       method: 'POST',
-      uri: config.server + '/v1/streams/' + streamId + '/events',
+      uri: ONESELF_HOST + '/v1/streams/' + streamId + '/events',
       gzip: true,
       headers: {
         'Authorization': writeToken,

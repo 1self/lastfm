@@ -2,6 +2,10 @@
 var _ = require('lodash');
 var request = require('request');
 var q = require("q");
+var ONESELF_HOST = process.env.ONESELF_HOST;
+var INTEGRATION_HOST = process.env.INTEGRATION_HOST;
+var APP_ID = process.env.APP_ID;
+var APP_SECRET = process.env.APP_SECRET;
 
 exports.index = function (req, res) {
   var username = req.body.username;
@@ -14,38 +18,24 @@ exports.index = function (req, res) {
     return;
   }
 
-  var callbackUrl = 'http://localhost:9001/api/sync?username='
+  var callbackUrl = INTEGRATION_HOST + '/api/sync?username='
     + username
     + '&latestSyncField={{latestSyncField}}'
     + '&streamid={{streamid}}';
 
-  /*	var config = {
-   server: 'https://api-staging.1self.co',
-   appId: "app-id-8aae965172e09b182bede2d71c2b7ebe",
-   appSecret: "app-secret-23e3afadea809f6697d19a8f1754e37df72522b310d57107d5ddb10bda821dd6",
-   callbackUrl: callbackUrl
-   };
-   */
-
-  var config = {
-    server: 'http://localhost:5000',
-    appId: "abc",
-    appSecret: "123",
-    callbackUrl: callbackUrl
-  };
   var createStream = function (oneselfUsername, registrationToken) {
     console.log("Creating stream ... ");
     var deferred = q.defer();
     request({
       method: 'POST',
-      uri: config.server + '/v1/users/' + oneselfUsername + '/streams',
+      uri: ONESELF_HOST + '/v1/users/' + oneselfUsername + '/streams',
       headers: {
-        'Authorization': config.appId + ':' + config.appSecret,
+        'Authorization': APP_ID + ':' + APP_SECRET,
         'registration-token': registrationToken
       },
       json: true,
       body: {
-        callbackUrl: config.callbackUrl
+        callbackUrl: callbackUrl
       }
     }, function (e, response, body) {
       if (response.statusCode === 401) {
@@ -66,10 +56,9 @@ exports.index = function (req, res) {
   var sync = function (stream) {
     console.log("Syncing...");
     var deferred = q.defer();
-    var callbackUrl = config.callbackUrl.replace('{{streamid}}', stream.streamid);
-
+    var callbackUrlWithStream = stream.callbackUrl.replace('{{streamid}}', stream.streamid);
     request({
-      method: 'POST', uri: callbackUrl, gzip: true, headers: {
+      method: 'POST', uri: callbackUrlWithStream, gzip: true, headers: {
         'Authorization': stream.writeToken
       }
     }, function (e, response, body) {

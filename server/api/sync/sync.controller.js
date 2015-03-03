@@ -125,7 +125,9 @@ exports.index = function (req, res) {
       console.log("Sync Started!!!");
       return numberOfPagesToFetch(username, lastSyncDate)
     })
-    .then(createPagesToFetch)
+    .then(createPagesToFetch, function(){
+      res.status(200).send("Nothing to sync!!! Everything up-to-date...");
+    })
     .then(fetchRecentTracks)
     .then(function () {
       console.log("Sync Complete!!!");
@@ -155,8 +157,14 @@ var numberOfPagesToFetch = function (username, lastSyncDate) {
       deferred.reject(error);
     }
     var data = JSON.parse(body);
-    var totalPages = data.recenttracks["@attr"].totalPages;
-    deferred.resolve(parseInt(totalPages));
+    console.log("Data: ", data);
+    if(data.recenttracks && data.recenttracks["@attr"]){
+      var totalPages = data.recenttracks["@attr"].totalPages;
+      deferred.resolve(parseInt(totalPages));
+    }
+    else {
+      deferred.reject("No pages to fetch!");
+    }
   });
   return deferred.promise;
 };

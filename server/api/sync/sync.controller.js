@@ -79,7 +79,7 @@ exports.index = function (req, res) {
   var createSyncStartEvent = function () {
     return {
       "dateTime": new Date().toISOString(),
-      "objectTags": ["sync"],
+      "objectTags": ["1self", "integration", "sync"],
       "actionTags": ["start"],
       "properties": {
         "source": "last.fm"
@@ -89,7 +89,7 @@ exports.index = function (req, res) {
   var createSyncCompleteEvent = function () {
     return {
       "dateTime": new Date().toISOString(),
-      "objectTags": ["sync"],
+      "objectTags": ["1self", "integration", "sync"],
       "actionTags": ["complete"],
       "properties": {
         "source": "last.fm"

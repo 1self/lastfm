@@ -1,8 +1,8 @@
 node_modules
-public
 .tmp
 .idea
 client/bower_components
 dist
 lastfm.log
 /server/config/local.env.js
+set_env.sh

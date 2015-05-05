@@ -1,25 +1,21 @@
 'use strict';
 
 angular.module('lastfmApp')
-  .controller('MainCtrl', function ($scope, $sce, $http) {
-    // $scope.awesomeThings = [];
-   // console.log('click'); 
-
-    // $http.get('/api/things').success(function(awesomeThings) {
-    //   $scope.awesomeThings = awesomeThings;
-
-    $scope.setupSync = function() {
-    	console.log('click');
-    	console.log($scope.name);
-
-    	var postMessage = {};
-    	postMessage.username = $scope.name;
-    	console.log(postMessage);
-    	$http.post('/api/setup', postMessage).success(function(data) {
-        	console.log('success');
-        	console.log(data);
-            $scope.streamUrl = $sce.trustAsResourceUrl(data.barChart);
-            $scope.jsonUrl = $sce.trustAsResourceUrl(data.jsonUrl);
-    	});
+  .controller('MainCtrl', function ($location, $scope, $sce, $http) {
+    $scope.setupSync = function () {
+      var postMessage = {};
+      postMessage.username = $scope.name;
+      postMessage.oneselfUsername = $location.search().username;
+      postMessage.registrationToken = $location.search().token;
+      console.log(postMessage);
+      $http.post('/api/setup', postMessage)
+        .success(function (data) {
+          window.location.href = "http://localhost:5000/integrations";
+          //window.location.href = "https://app-staging.1self.co/integrations";
+          //window.location.href = "https://app.1self.co/integrations";
+        })
+        .error(function (err) {
+          console.log('error : ' + err);
+        });
     }
- });
+  });

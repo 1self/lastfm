@@ -6,6 +6,7 @@ var ONESELF_HOST = process.env.ONESELF_HOST;
 var INTEGRATION_HOST = process.env.INTEGRATION_HOST;
 var APP_ID = process.env.APP_ID;
 var APP_SECRET = process.env.APP_SECRET;
+var CONTEXT_URI = process.env.CONTEXT_URI;
 
 exports.index = function (req, res) {
   var username = req.body.username;
@@ -28,7 +29,7 @@ exports.index = function (req, res) {
     var deferred = q.defer();
     request({
       method: 'POST',
-      uri: ONESELF_HOST + '/v1/users/' + oneselfUsername + '/streams',
+      uri: CONTEXT_URI + '/v1/users/' + oneselfUsername + '/streams',
       headers: {
         'Authorization': APP_ID + ':' + APP_SECRET,
         'registration-token': registrationToken

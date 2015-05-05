@@ -20,6 +20,7 @@ module.exports = function(app) {
   // All other routes should redirect to the index.html
   app.route('/*')
     .get(function(req, res) {
+	console.log('sending ' + app.get('appPath') + '/index.html');
       res.sendfile(app.get('appPath') + '/index.html');
     });
 };

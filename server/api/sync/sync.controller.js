@@ -27,8 +27,8 @@ exports.index = function (req, res) {
           "track-url": recentTrackInfo.url,
           "artist-name": recentTrackInfo.artist["#text"],
           "album-name": recentTrackInfo.album["#text"],
-          "source": "last.fm"
         },
+        "source": "last.fm",
         "latestSyncField": {
           "$date": dt.toISOString()
         }
@@ -81,8 +81,8 @@ exports.index = function (req, res) {
       "dateTime": new Date().toISOString(),
       "objectTags": ["1self", "integration", "sync"],
       "actionTags": ["start"],
+      "source": "last.fm",
       "properties": {
-        "source": "last.fm"
       }
     };
   };
@@ -91,8 +91,8 @@ exports.index = function (req, res) {
       "dateTime": new Date().toISOString(),
       "objectTags": ["1self", "integration", "sync"],
       "actionTags": ["complete"],
+      "source": "last.fm",
       "properties": {
-        "source": "last.fm"
       }
     };
   };

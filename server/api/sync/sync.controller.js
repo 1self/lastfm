@@ -2,7 +2,7 @@
 var _ = require('lodash');
 var request = require("request");
 var q = require('q');
-var ONESELF_HOST = process.env.ONESELF_HOST;
+var CONTEXT_URI = process.env.CONTEXT_URI;
 
 exports.index = function (req, res) {
   var username = req.query.username;
@@ -39,7 +39,7 @@ exports.index = function (req, res) {
     var deferred = q.defer();
     request({
       method: 'POST',
-      uri: ONESELF_HOST + '/v1/streams/' + streamId + '/events/batch',
+      uri: CONTEXT_URI + '/v1/streams/' + streamId + '/events/batch',
       gzip: true,
       headers: {
         'Authorization': writeToken,
@@ -100,7 +100,7 @@ exports.index = function (req, res) {
     var deferred = q.defer();
     request({
       method: 'POST',
-      uri: ONESELF_HOST + '/v1/streams/' + streamId + '/events',
+      uri: CONTEXT_URI + '/v1/streams/' + streamId + '/events',
       gzip: true,
       headers: {
         'Authorization': writeToken,

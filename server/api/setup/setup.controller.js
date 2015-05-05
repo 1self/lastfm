@@ -3,7 +3,6 @@ var _ = require('lodash');
 var request = require('request');
 var q = require("q");
 var ONESELF_HOST = process.env.ONESELF_HOST;
-var INTEGRATION_HOST = process.env.INTEGRATION_HOST;
 var APP_ID = process.env.APP_ID;
 var APP_SECRET = process.env.APP_SECRET;
 var CONTEXT_URI = process.env.CONTEXT_URI;
@@ -19,7 +18,8 @@ exports.index = function (req, res) {
     return;
   }
 
-  var callbackUrl = INTEGRATION_HOST + '/api/sync?username='
+  var hostUrl = req.protocol + '://' + req.get('host');
+  var callbackUrl = hostUrl + '/api/sync?username='
     + username
     + '&latestSyncField={{latestSyncField}}'
     + '&streamid={{streamid}}';
@@ -82,7 +82,7 @@ exports.index = function (req, res) {
     createStream(oneselfUsername, registrationToken)
       .then(function (stream) {
         sync(stream);
-        res.status(200).send();
+        res.status(200).send({redirect: CONTEXT_URI + '/integrations'});
       }).catch(function (error) {
         res.status(200).send();
       });

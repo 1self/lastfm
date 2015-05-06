@@ -2,6 +2,7 @@ node_modules
 .tmp
 .idea
 client/bower_components
+.env
 dist
 lastfm.log
 /server/config/local.env.js

@@ -2,9 +2,6 @@
 var _ = require('lodash');
 var request = require('request');
 var q = require("q");
-var LASTFM_APP_ID = process.env.LASTFM_APP_ID;
-var LASTFM_APP_SECRET = process.env.LASTFM_APP_SECRET;
-var CONTEXT_URI = process.env.CONTEXT_URI;
 
 var logInfo = function(req, username, message, object){
   req.logger.info(username + ': ' + message, object);

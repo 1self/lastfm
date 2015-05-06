@@ -2,9 +2,8 @@
 var _ = require('lodash');
 var request = require('request');
 var q = require("q");
-var ONESELF_HOST = process.env.ONESELF_HOST;
-var APP_ID = process.env.APP_ID;
-var APP_SECRET = process.env.APP_SECRET;
+var LASTFM_APP_ID = process.env.LASTFM_APP_ID;
+var LASTFM_APP_SECRET = process.env.LASTFM_APP_SECRET;
 var CONTEXT_URI = process.env.CONTEXT_URI;
 
 exports.index = function (req, res) {
@@ -31,7 +30,7 @@ exports.index = function (req, res) {
       method: 'POST',
       uri: CONTEXT_URI + '/v1/users/' + oneselfUsername + '/streams',
       headers: {
-        'Authorization': APP_ID + ':' + APP_SECRET,
+        'Authorization': LASTFM_APP_ID + ':' + LASTFM_APP_SECRET,
         'registration-token': registrationToken
       },
       json: true,

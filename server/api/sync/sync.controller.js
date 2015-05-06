@@ -85,7 +85,7 @@ exports.index = function (req, res) {
     url += "&page=" + pageNum;
     url += "&user=" + username;
 
-    logDebug(reqm username, 'getting recent tracks for user: url', url)
+    logDebug(req, username, 'getting recent tracks for user: url', url)
     request({
       method: 'GET',
       uri: url,
@@ -93,7 +93,7 @@ exports.index = function (req, res) {
     }, function (error, response, body) {
       var recentTrackData = JSON.parse(body);
       if (recentTrackData.error) {
-        logDebug(req, username, 'couldn''t fetch the events: recentDataTrack.error', recentDataTrack.error);
+        logDebug(req, username, 'couldn\'t fetch the events: recentDataTrack.error', recentDataTrack.error);
         deferred.reject(recentTrackData.error);
       }
       else {

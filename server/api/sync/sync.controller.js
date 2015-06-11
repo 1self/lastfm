@@ -4,11 +4,26 @@ var request = require("request");
 var q = require('q');
 var CONTEXT_URI = process.env.CONTEXT_URI;
 
+var logInfo = function(req, username, message, object){
+  req.logger.info(username + ': ' + message, object);
+}
+
+var logDebug = function(req, username, message, object){
+  req.logger.debug(username + ': ' + message, object);
+}
+
+var logError = function(req, username, message, object){
+  req.logger.error(username + ': ' + message, object);
+}
+
 exports.index = function (req, res) {
+
   var username = req.query.username;
   var lastSyncDate = req.query.latestSyncField;
   var streamId = req.query.streamid;
   var writeToken = req.headers.authorization;
+
+  logInfo(req, username, 'starting sync: lastSyncDate, streamId, writeToken', [lastSyncDate, streamid, writeToken]);
   var createPagesToFetch = function (totalPages) {
     return _.range(1, totalPages + 1);
   };
@@ -35,11 +50,16 @@ exports.index = function (req, res) {
       };
     });
   };
+
   var sendEventsTo1self = function (events) {
     var deferred = q.defer();
+
+    var batchApiUri = CONTEXT_URI + '/v1/streams/' + streamId + '/events/batch';
+    logInfo(req, username, 'sending events to batchapi, batchApiUri, writeToken', [batchApiUri, writeToken]);
+    logDebug(req, username, 'batch events', events);
     request({
       method: 'POST',
-      uri: CONTEXT_URI + '/v1/streams/' + streamId + '/events/batch',
+      uri: batchApiUri,
       gzip: true,
       headers: {
         'Authorization': writeToken,
@@ -58,8 +78,33 @@ exports.index = function (req, res) {
     });
     return deferred.promise;
   };
+
+  var getRecentTracksForUser = function (username, pageNum) {
+    var deferred = q.defer();
+    var url = "http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&api_key=0900562e22abd0500f0432147482cfc1&format=json&limit=200";
+    url += "&page=" + pageNum;
+    url += "&user=" + username;
+
+    logDebug(req, username, 'getting recent tracks for user: url', url)
+    request({
+      method: 'GET',
+      uri: url,
+      gzip: true
+    }, function (error, response, body) {
+      var recentTrackData = JSON.parse(body);
+      if (recentTrackData.error) {
+        logDebug(req, username, 'couldn\'t fetch the events: recentDataTrack.error', recentDataTrack.error);
+        deferred.reject(recentTrackData.error);
+      }
+      else {
+        logDebug(req, username, 'recenttracks.track', recentTrackData.recenttracks.track);
+        deferred.resolve(recentTrackData.recenttracks.track);
+      }
+    });
+    return deferred.promise;
+  };
+
   var fetchRecentTracks = function (pagesToBeFetched) {
-    //console.log("Pages To be fetched: ", pagesToBeFetched);
     return pagesToBeFetched
       .reduce(function (chain, page) {
         return chain
@@ -69,9 +114,9 @@ exports.index = function (req, res) {
           .then(create1SelfEvents)
           .then(sendEventsTo1self)
           .then(function (body) {
-            console.log("Events sent to 1self successfully! For page: ", page);
+            logInfo(req, username, "events sent to 1self: page", page);
           }, function (error) {
-            console.log("Error: ", error);
+            logError.log(req, username, "error sending page: page, err ", [page, error]);
           });
       }, q.resolve());
 
@@ -96,11 +141,15 @@ exports.index = function (req, res) {
       }
     };
   };
+
   var send1SelfSyncEvent = function (event) {
     var deferred = q.defer();
+
+    var syncEventPostApi = CONTEXT_URI + '/v1/streams/' + streamId + '/events';
+    logDebug(req, username, 'sending sync event: syncEventPostApi, event', [syncEventPostApi, event]);
     request({
       method: 'POST',
-      uri: CONTEXT_URI + '/v1/streams/' + streamId + '/events',
+      uri: syncEventPostApi,
       gzip: true,
       headers: {
         'Authorization': writeToken,
@@ -110,27 +159,64 @@ exports.index = function (req, res) {
       body: event
     }, function (err, response, body) {
       if (err) {
+        logDebug(req, username, 'error sending sync event: error', error);
         deferred.reject(err);
       }
       if (response.statusCode === 404) {
-        deferred.reject("Stream Not Found!")
+        logDebug(req, username, 'error sending sync event: responseCode', response.statusCode);
+        deferred.reject("Stream Not Found!");
       }
       deferred.resolve(body);
     });
     return deferred.promise;
   };
+
+  var numberOfPagesToFetch = function (username, lastSyncDate) {
+    var deferred = q.defer();
+    var limit = 200;
+    var url = "http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&api_key=0900562e22abd0500f0432147482cfc1&format=json&limit=200";
+    url += "&user=" + username;
+    if (lastSyncDate !== undefined) {
+      var unixTimeStamp = Date.parse(lastSyncDate) / 1000;
+      url += "&from=" + unixTimeStamp;
+    }
+
+    logDebug(req, username, 'calculating number of pages to fetch: url', url);
+
+    request({
+      method: 'GET',
+      uri: url,
+      gzip: true
+    }, function (error, response, body) {
+      if (error) {
+        deferred.reject(error);
+      }
+      var data = JSON.parse(body);
+      logDebug(req, username, "lastfm returned pages: data", data);
+      if(data.recenttracks && data.recenttracks["@attr"]){
+        var totalPages = data.recenttracks["@attr"].totalPages;
+        logDebug(req, username, "totalPages", totalPages);
+        deferred.resolve(parseInt(totalPages));
+      }
+      else {
+        deferred.reject("No pages to fetch!");
+      }
+    });
+    return deferred.promise;
+  };
+
   var syncStartEvent = createSyncStartEvent();
   send1SelfSyncEvent(syncStartEvent)
     .then(function () {
-      console.log("Sync Started!!!");
-      return numberOfPagesToFetch(username, lastSyncDate)
+      logInfo(req, username, 'sync started');
+      return numberOfPagesToFetch(username, lastSyncDate);
     })
     .then(createPagesToFetch, function(){
-      res.status(200).send("Nothing to sync!!! Everything up-to-date...");
+      res.status(200).send("Nothing to sync, everything up-to-date...");
     })
     .then(fetchRecentTracks)
     .then(function () {
-      console.log("Sync Complete!!!");
+      logInfo(req, username, 'sync complete');
       var syncCompleteEvent = createSyncCompleteEvent();
       return send1SelfSyncEvent(syncCompleteEvent);
     })
@@ -139,56 +225,6 @@ exports.index = function (req, res) {
     })
 };
 
-var numberOfPagesToFetch = function (username, lastSyncDate) {
-  var deferred = q.defer();
-  var limit = 200;
-  var url = "http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&api_key=0900562e22abd0500f0432147482cfc1&format=json&limit=200";
-  url += "&user=" + username;
-  if (lastSyncDate !== undefined) {
-    var unixTimeStamp = Date.parse(lastSyncDate) / 1000;
-    url += "&from=" + unixTimeStamp;
-  }
-  request({
-    method: 'GET',
-    uri: url,
-    gzip: true
-  }, function (error, response, body) {
-    if (error) {
-      deferred.reject(error);
-    }
-    var data = JSON.parse(body);
-    console.log("Data: ", data);
-    if(data.recenttracks && data.recenttracks["@attr"]){
-      var totalPages = data.recenttracks["@attr"].totalPages;
-      deferred.resolve(parseInt(totalPages));
-    }
-    else {
-      deferred.reject("No pages to fetch!");
-    }
-  });
-  return deferred.promise;
-};
 
-var getRecentTracksForUser = function (username, pageNum) {
-  var deferred = q.defer();
-  var url = "http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&api_key=0900562e22abd0500f0432147482cfc1&format=json&limit=200";
-  url += "&page=" + pageNum;
-  url += "&user=" + username;
 
-  request({
-    method: 'GET',
-    uri: url,
-    gzip: true
-  }, function (error, response, body) {
-    var recentTrackData = JSON.parse(body);
-    if (recentTrackData.error) {
-      console.log("Couldn't fetch the events");
-      console.log("Url: ", url);
-      deferred.reject(recentTrackData.error);
-    }
-    else {
-      deferred.resolve(recentTrackData.recenttracks.track);
-    }
-  });
-  return deferred.promise;
-};
+

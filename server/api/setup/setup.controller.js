@@ -6,7 +6,21 @@ var LASTFM_APP_ID = process.env.LASTFM_APP_ID;
 var LASTFM_APP_SECRET = process.env.LASTFM_APP_SECRET;
 var CONTEXT_URI = process.env.CONTEXT_URI;
 
+var logInfo = function(req, username, message, object){
+  req.logger.info(username + ': ' + message, object);
+}
+
+var logDebug = function(req, username, message, object){
+  req.logger.debug(username + ': ' + message, object);
+}
+
+var logError = function(req, username, message, object){
+  req.logger.error(username + ': ' + message, object);
+}
+
 exports.index = function (req, res) {
+  logInfo(req, oneselfUsername, 'setting up integration');
+  logDebug(req, username, 'username, registrationToken: ', [username, registrationToken]);
   var username = req.body.username;
   var oneselfUsername = req.body.oneselfUsername;
   var registrationToken = req.body.registrationToken;
@@ -23,12 +37,16 @@ exports.index = function (req, res) {
     + '&latestSyncField={{latestSyncField}}'
     + '&streamid={{streamid}}';
 
+  logDebug(req, username, 'hostUrl, callbackUrl', [hostUrl, callbackUrl]);
+
   var createStream = function (oneselfUsername, registrationToken) {
-    console.log("Creating stream ... ");
+    var streamPostUri = CONTEXT_URI + '/v1/users/' + oneselfUsername + '/streams'
+    var authorization = LASTFM_APP_ID + ':' + LASTFM_APP_SECRET;
+    logDebug(req, username, 'creating stream: streamPostUri, authorization', [streamPostUri, streamPostUri]);
     var deferred = q.defer();
     request({
       method: 'POST',
-      uri: CONTEXT_URI + '/v1/users/' + oneselfUsername + '/streams',
+      uri: streamPostUri,
       headers: {
         'Authorization': LASTFM_APP_ID + ':' + LASTFM_APP_SECRET,
         'registration-token': registrationToken
@@ -53,10 +71,11 @@ exports.index = function (req, res) {
     });
     return deferred.promise;
   };
+
   var sync = function (stream) {
-    console.log("Syncing...");
     var deferred = q.defer();
     var callbackUrlWithStream = stream.callbackUrl.replace('{{streamid}}', stream.streamid);
+    logDebug(req, username, 'syncing first time: callbackUrlWithStream, writeToken', [callbackUrlWithStream, stream.writeToken]);
     request({
       method: 'POST', uri: callbackUrlWithStream, gzip: true, headers: {
         'Authorization': stream.writeToken
@@ -75,14 +94,18 @@ exports.index = function (req, res) {
     return deferred.promise;
   };
   if (registrationToken === undefined || username === undefined) {
+    logInfo(req, username, 'registrationToken or username blank', [registrationToken, username]);
     res.status(200).send();
   }
   else {
     createStream(oneselfUsername, registrationToken)
       .then(function (stream) {
         sync(stream);
-        res.status(200).send({redirect: CONTEXT_URI + '/integrations'});
+        var redirectUri = CONTEXT_URI + '/integrations';
+        logDebug(req, username, 'sending redirect: ', redirectUri)
+        res.status(200).send({redirect: redirectUri});
       }).catch(function (error) {
+        logError(req, username, 'error in create stream promise chain: ', error);
         res.status(200).send();
       });
   }

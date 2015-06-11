@@ -12,7 +12,6 @@ module.exports = function(app) {
   console.log('setting up routes');
   app.use('/api/sync', require('./api/sync'));
   app.use('/api/setup', require('./api/setup'));
-  
   // All undefined asset or api routes should return a 404
   // app.route('/:url(auth|components|app|bower_components|assets)/*')
   //  .get(errors[404]);

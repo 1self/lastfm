@@ -7,3 +7,5 @@ dist
 lastfm.log
 /server/config/local.env.js
 set_env.sh
+.env
+*.log

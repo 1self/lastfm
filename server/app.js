@@ -25,10 +25,16 @@ winston.verbose('Verbose will be logged here');
 winston.debug('Debug will be logged here');
 winston.silly('Silly will be logged here');
 
+winston.info('$PORT=' + process.env.PORT);
+
 var attachLogger = function(req, res, next){
+	winston.info("Attaching logger to reqeust");
 	req.logger = winston;
 	next();
 };
+
+winston.info('logger', attachLogger);
+
 app.use(attachLogger);
   
 // Start server

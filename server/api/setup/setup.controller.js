@@ -2,28 +2,37 @@
 var _ = require('lodash');
 var request = require('request');
 var q = require("q");
+
+var CONTEXT_URI = process.env.CONTEXT_URI;
+var ONESELF_API = process.env.ONESELF_API;
 var LASTFM_APP_ID = process.env.LASTFM_APP_ID;
 var LASTFM_APP_SECRET = process.env.LASTFM_APP_SECRET;
-var CONTEXT_URI = process.env.CONTEXT_URI;
+var LASTFM_HOST = process.env.LASTFM_HOST;
+
+console.log('CONTEXT_URI=' + CONTEXT_URI);
+console.log('ONESELF_API=' + ONESELF_API);
+console.log('LASTFM_APP_ID=' + LASTFM_APP_ID);
+console.log('LASTFM_APP_SECRET=' + LASTFM_APP_SECRET);
+console.log('LASTFM_HOST=' + LASTFM_HOST);
 
 var logInfo = function(req, username, message, object){
-  req.logger.info(username + ': ' + message, object);
+  req.app.logger.info(username + ': ' + message, object);
 }
 
 var logDebug = function(req, username, message, object){
-  req.logger.debug(username + ': ' + message, object);
+  req.app.logger.debug(username + ': ' + message, object);
 }
 
 var logError = function(req, username, message, object){
-  req.logger.error(username + ': ' + message, object);
+  req.app.logger.error(username + ': ' + message, object);
 }
 
 exports.index = function (req, res) {
-  logInfo(req, oneselfUsername, 'setting up integration');
-  logDebug(req, username, 'username, registrationToken: ', [username, registrationToken]);
   var username = req.body.username;
   var oneselfUsername = req.body.oneselfUsername;
+  logInfo(req, oneselfUsername, 'setting up integration');
   var registrationToken = req.body.registrationToken;
+  logDebug(req, username, 'username, registrationToken: ', [username, registrationToken]);
   if (username === undefined || username.length === 0) {
     res.status(400).json({
       status: "username is blank"
@@ -31,18 +40,17 @@ exports.index = function (req, res) {
     return;
   }
 
-  var hostUrl = req.protocol + '://' + req.get('host');
-  var callbackUrl = hostUrl + '/api/sync?username='
+  var callbackUrl = LASTFM_HOST + '/api/sync?username='
     + username
     + '&latestSyncField={{latestSyncField}}'
     + '&streamid={{streamid}}';
 
-  logDebug(req, username, 'hostUrl, callbackUrl', [hostUrl, callbackUrl]);
+  logDebug(req, username, 'callbackUrl', [callbackUrl]);
 
   var createStream = function (oneselfUsername, registrationToken) {
-    var streamPostUri = CONTEXT_URI + '/v1/users/' + oneselfUsername + '/streams'
+    var streamPostUri = ONESELF_API + '/v1/users/' + oneselfUsername + '/streams'
     var authorization = LASTFM_APP_ID + ':' + LASTFM_APP_SECRET;
-    logDebug(req, username, 'creating stream: streamPostUri, authorization', [streamPostUri, streamPostUri]);
+    logDebug(req, username, 'creating stream: streamPostUri, authorization', [streamPostUri, authorization]);
     var deferred = q.defer();
     request({
       method: 'POST',
@@ -56,6 +64,14 @@ exports.index = function (req, res) {
         callbackUrl: callbackUrl
       }
     }, function (e, response, body) {
+      if (e) {
+        deferred.reject("Error: ", e);
+      }
+      if(response === undefined){
+        logDebug(req, username, 'no response, streamPostUri: ', streamPostUri);
+        deferred.reject('no response');
+        return;
+      }
       if (response.statusCode === 401) {
         deferred.reject('auth error: check your appId and appSecret', null);
         return;
@@ -63,9 +79,6 @@ exports.index = function (req, res) {
       if (response.statusCode === 400) {
         deferred.reject('auth error: check your appId and appSecret', null);
         return;
-      }
-      if (e) {
-        deferred.reject("Error: ", e);
       }
       deferred.resolve(body);
     });
@@ -93,12 +106,13 @@ exports.index = function (req, res) {
     });
     return deferred.promise;
   };
+
   if (registrationToken === undefined || username === undefined) {
     logInfo(req, username, 'registrationToken or username blank', [registrationToken, username]);
     res.status(200).send();
   }
   else {
-    createStream(oneselfUsername, registrationToken)
+    createStream(oneselfUsername, registrationToken) 
       .then(function (stream) {
         sync(stream);
         var redirectUri = CONTEXT_URI + '/integrations';

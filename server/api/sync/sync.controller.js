@@ -2,18 +2,18 @@
 var _ = require('lodash');
 var request = require("request");
 var q = require('q');
-var CONTEXT_URI = process.env.CONTEXT_URI;
+var ONESELF_API = process.env.ONESELF_API;
 
 var logInfo = function(req, username, message, object){
-  req.logger.info(username + ': ' + message, object);
+  req.app.logger.info(username + ': ' + message, object);
 }
 
 var logDebug = function(req, username, message, object){
-  req.logger.debug(username + ': ' + message, object);
+  req.app.logger.debug(username + ': ' + message, object);
 }
 
 var logError = function(req, username, message, object){
-  req.logger.error(username + ': ' + message, object);
+  req.app.logger.error(username + ': ' + message, object);
 }
 
 exports.index = function (req, res) {
@@ -23,7 +23,7 @@ exports.index = function (req, res) {
   var streamId = req.query.streamid;
   var writeToken = req.headers.authorization;
 
-  logInfo(req, username, 'starting sync: lastSyncDate, streamId, writeToken', [lastSyncDate, streamid, writeToken]);
+  logInfo(req, username, 'starting sync: lastSyncDate, streamId, writeToken', [lastSyncDate, streamId, writeToken]);
   var createPagesToFetch = function (totalPages) {
     return _.range(1, totalPages + 1);
   };
@@ -34,12 +34,12 @@ exports.index = function (req, res) {
       dt.setTime(listenDate * 1000);
       return {
         "dateTime": dt.toISOString(),
-        "objectTags": ["music"],
+        "objectTags": ["music"],  
         "actionTags": ["listen"],
+        "id": recentTrackInfo.mbid,
+        "url": recentTrackInfo.url,
         "properties": {
           "track-name": recentTrackInfo.name,
-          "track-mbid": recentTrackInfo.mbid,
-          "track-url": recentTrackInfo.url,
           "artist-name": recentTrackInfo.artist["#text"],
           "album-name": recentTrackInfo.album["#text"],
         },
@@ -54,7 +54,7 @@ exports.index = function (req, res) {
   var sendEventsTo1self = function (events) {
     var deferred = q.defer();
 
-    var batchApiUri = CONTEXT_URI + '/v1/streams/' + streamId + '/events/batch';
+    var batchApiUri = ONESELF_API + '/v1/streams/' + streamId + '/events/batch';
     logInfo(req, username, 'sending events to batchapi, batchApiUri, writeToken', [batchApiUri, writeToken]);
     logDebug(req, username, 'batch events', events);
     request({
@@ -91,14 +91,21 @@ exports.index = function (req, res) {
       uri: url,
       gzip: true
     }, function (error, response, body) {
-      var recentTrackData = JSON.parse(body);
-      if (recentTrackData.error) {
-        logDebug(req, username, 'couldn\'t fetch the events: recentDataTrack.error', recentDataTrack.error);
-        deferred.reject(recentTrackData.error);
+      if(error){  
+        logError(req, username, error);
+        logDebug(new Error().stack);
+        deferred.reject(error);
       }
-      else {
-        logDebug(req, username, 'recenttracks.track', recentTrackData.recenttracks.track);
-        deferred.resolve(recentTrackData.recenttracks.track);
+      else{
+        var recentTrackData = JSON.parse(body);
+        if (recentTrackData.error) {
+          logDebug(req, username, 'couldn\'t fetch the events: recentDataTrack.error', recentDataTrack.error);
+          deferred.reject(recentTrackData.error);
+        }
+        else {
+          logDebug(req, username, 'recenttracks.track', recentTrackData.recenttracks.track);
+          deferred.resolve(recentTrackData.recenttracks.track);
+        }
       }
     });
     return deferred.promise;
@@ -145,7 +152,7 @@ exports.index = function (req, res) {
   var send1SelfSyncEvent = function (event) {
     var deferred = q.defer();
 
-    var syncEventPostApi = CONTEXT_URI + '/v1/streams/' + streamId + '/events';
+    var syncEventPostApi = ONESELF_API + '/v1/streams/' + streamId + '/events';
     logDebug(req, username, 'sending sync event: syncEventPostApi, event', [syncEventPostApi, event]);
     request({
       method: 'POST',

@@ -40,10 +40,11 @@ exports.index = function (req, res) {
     return;
   }
 
-  var callbackUrl = LASTFM_HOST + '/api/sync?username='
-    + username
-    + '&latestSyncField={{latestSyncField}}'
-    + '&streamid={{streamid}}';
+  var callbackUrl = [LASTFM_HOST, 
+                    '/api/sync?username=', 
+                    username, 
+                    '&latestSyncField={{latestSyncField}}', 
+                    '&streamid={{streamid}}'].join('');
 
   logDebug(req, username, 'callbackUrl', [callbackUrl]);
 

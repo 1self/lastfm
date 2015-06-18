@@ -17,5 +17,5 @@ angular.module('lastfmApp')
         .error(function (err) {
           console.log('error : ' + err);
         });
-    }
+    };
   });

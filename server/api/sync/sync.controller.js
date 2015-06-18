@@ -99,7 +99,7 @@ exports.index = function (req, res) {
       else{
         var recentTrackData = JSON.parse(body);
         if (recentTrackData.error) {
-          logDebug(req, username, 'couldn\'t fetch the events: recentDataTrack.error', recentDataTrack.error);
+          logDebug(req, username, 'couldn\'t fetch the events: recentDataTrack.error', recentTrackData.error);
           deferred.reject(recentTrackData.error);
         }
         else {
@@ -166,7 +166,7 @@ exports.index = function (req, res) {
       body: event
     }, function (err, response, body) {
       if (err) {
-        logDebug(req, username, 'error sending sync event: error', error);
+        logDebug(req, username, 'error sending sync event: error', err);
         deferred.reject(err);
       }
       if (response.statusCode === 404) {

@@ -30,8 +30,8 @@ var logError = function(req, username, message, object){
 exports.index = function (req, res) {
   var username = req.body.username;
   var oneselfUsername = req.body.oneselfUsername;
-  logInfo(req, oneselfUsername, 'setting up integration');
   var registrationToken = req.body.registrationToken;
+  logInfo(req, oneselfUsername, 'setting up integration', username);
   logDebug(req, username, 'username, registrationToken: ', [username, registrationToken]);
   if (username === undefined || username.length === 0) {
     res.status(400).json({
@@ -40,10 +40,11 @@ exports.index = function (req, res) {
     return;
   }
 
-  var callbackUrl = LASTFM_HOST + '/api/sync?username='
-    + username
-    + '&latestSyncField={{latestSyncField}}'
-    + '&streamid={{streamid}}';
+  var callbackUrl = [LASTFM_HOST, 
+                    '/api/sync?username=', 
+                    username, 
+                    '&latestSyncField={{latestSyncField}}', 
+                    '&streamid={{streamid}}'].join('');
 
   logDebug(req, username, 'callbackUrl', [callbackUrl]);
 

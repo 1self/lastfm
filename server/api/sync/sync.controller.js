@@ -12,6 +12,10 @@ var logDebug = function(req, username, message, object){
   req.app.logger.debug(username + ': ' + message, object);
 }
 
+var logSilly = function(req, username, message, object){
+  req.app.logger.silly(username + ': ' + message, object);
+}
+
 var logError = function(req, username, message, object){
   req.app.logger.error(username + ': ' + message, object);
 }
@@ -19,17 +23,25 @@ var logError = function(req, username, message, object){
 exports.index = function (req, res) {
 
   var username = req.query.username;
-  var lastSyncDate = req.query.latestSyncField;
+  var lastSyncField = req.query.latestSyncField;
   var streamId = req.query.streamid;
   var writeToken = req.headers.authorization;
 
-  logInfo(req, username, 'starting sync: lastSyncDate, streamId, writeToken', [lastSyncDate, streamId, writeToken]);
+  logInfo(req, username, 'starting sync: lastSyncDate, streamId, writeToken', [lastSyncField, streamId, writeToken]);
   var createPagesToFetch = function (totalPages) {
     return _.range(1, totalPages + 1);
   };
+
   var create1SelfEvents = function (recentTracksInfo) {
     return recentTracksInfo.map(function (recentTrackInfo) {
       var dt = new Date();
+
+      // you don't get a date for tracks that are currently playing. We'll
+      // get this data when the current listen of the track is over
+      if(recentTrackInfo["@attr"] && recentTrackInfo["@attr"].nowplaying){
+        return null;
+      }
+
       var listenDate = recentTrackInfo.date.uts;
       dt.setTime(listenDate * 1000);
       return {
@@ -55,8 +67,8 @@ exports.index = function (req, res) {
     var deferred = q.defer();
 
     var batchApiUri = ONESELF_API + '/v1/streams/' + streamId + '/events/batch';
-    logInfo(req, username, 'sending events to batchapi, batchApiUri, writeToken', [batchApiUri, writeToken]);
-    logDebug(req, username, 'batch events', events);
+    logDebug(req, username, 'sending events to batchapi, batchApiUri, writeToken', [batchApiUri, writeToken]);
+    logSilly(req, username, 'batch events', events);
     request({
       method: 'POST',
       uri: batchApiUri,
@@ -98,12 +110,29 @@ exports.index = function (req, res) {
       }
       else{
         var recentTrackData = JSON.parse(body);
+
+        if(recentTrackData === undefined){
+          logError(req, username, 'recent track data is undefined, request url:', url);
+          deferred.reject('recent track data is undefined for user ' + username);
+        }
+
         if (recentTrackData.error) {
-          logDebug(req, username, 'couldn\'t fetch the events: recentDataTrack.error', recentDataTrack.error);
+          logError(req, username, 'couldn\'t fetch the events: recentDataTrack.error', recentTrackData.error);
           deferred.reject(recentTrackData.error);
         }
         else {
-          logDebug(req, username, 'recenttracks.track', recentTrackData.recenttracks.track);
+          if(recentTrackData.recenttracks === undefined){
+            logError(req, username, 'recenttracks is undefined, request url:', url);
+            deferred.reject('recenttracks is undefined for user ' + username);
+          }
+
+          if(recentTrackData.recenttracks.track === undefined){
+            logError(req, username, 'recenttracks.track is undefined, request url:', url);
+            deferred.reject('recenttracks.track is undefined for user ' + username);
+          }
+
+          logDebug(req, username, 'recenttracks count: ', recentTrackData.recenttracks.track.length);
+          logSilly(req, username, 'recenttracks.track', recentTrackData.recenttracks.track);
           deferred.resolve(recentTrackData.recenttracks.track);
         }
       }
@@ -114,6 +143,7 @@ exports.index = function (req, res) {
   var fetchRecentTracks = function (pagesToBeFetched) {
     return pagesToBeFetched
       .reduce(function (chain, page) {
+        logDebug(req, username, "creating promise chain for page: ", page);
         return chain
           .then(function () {
             return getRecentTracksForUser(username, page)
@@ -166,7 +196,7 @@ exports.index = function (req, res) {
       body: event
     }, function (err, response, body) {
       if (err) {
-        logDebug(req, username, 'error sending sync event: error', error);
+        logDebug(req, username, 'error sending sync event: error', err);
         deferred.reject(err);
       }
       if (response.statusCode === 404) {
@@ -183,8 +213,8 @@ exports.index = function (req, res) {
     var limit = 200;
     var url = "http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&api_key=0900562e22abd0500f0432147482cfc1&format=json&limit=200";
     url += "&user=" + username;
-    if (lastSyncDate !== undefined) {
-      var unixTimeStamp = Date.parse(lastSyncDate) / 1000;
+    if (lastSyncField !== undefined && lastSyncField !== '{{latestSyncField}}') {
+      var unixTimeStamp = Date.parse(lastSyncField) / 1000;
       url += "&from=" + unixTimeStamp;
     }
 
@@ -199,7 +229,7 @@ exports.index = function (req, res) {
         deferred.reject(error);
       }
       var data = JSON.parse(body);
-      logDebug(req, username, "lastfm returned pages: data", data);
+      logSilly(req, username, "lastfm returned pages: data", data);
       if(data.recenttracks && data.recenttracks["@attr"]){
         var totalPages = data.recenttracks["@attr"].totalPages;
         logDebug(req, username, "totalPages", totalPages);
@@ -212,23 +242,28 @@ exports.index = function (req, res) {
     return deferred.promise;
   };
 
+  var start = process.hrtime();
   var syncStartEvent = createSyncStartEvent();
   send1SelfSyncEvent(syncStartEvent)
     .then(function () {
-      logInfo(req, username, 'sync started');
-      return numberOfPagesToFetch(username, lastSyncDate);
+      logInfo(req, username, 'sync started, lastSyncField:', lastSyncField);
+      return numberOfPagesToFetch(username, lastSyncField);
     })
     .then(createPagesToFetch, function(){
       res.status(200).send("Nothing to sync, everything up-to-date...");
     })
     .then(fetchRecentTracks)
     .then(function () {
-      logInfo(req, username, 'sync complete');
+      var diff = process.hrtime(start);
+      logInfo(req, username, 'sync complete, took:', diff);
       var syncCompleteEvent = createSyncCompleteEvent();
       return send1SelfSyncEvent(syncCompleteEvent);
     })
     .then(function () {
       res.status(200).send("Synced all the events");
+    })
+    .catch(function(error) {
+      logError(req, username, "error sycning, error:", error);
     })
 };
 

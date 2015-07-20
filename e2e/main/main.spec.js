@@ -8,7 +8,7 @@ describe('Main View', function() {
     page = require('./main.po');
   });
 
-  it('should include jumbotron with correct data', function() {
+  // it('should include jumbotron with correct data', function() {
   
-  });
+  // });
 });

@@ -20,6 +20,10 @@ var logError = function(req, username, message, object){
   req.app.logger.error(username + ': ' + message, object);
 }
 
+var logWarning = function(req, username, message, object){
+  req.app.logger.warning(username + ': ' + message, object);
+}
+
 exports.index = function (req, res) {
 
   var username = req.query.username;
@@ -29,7 +33,20 @@ exports.index = function (req, res) {
 
   logInfo(req, username, 'starting sync: lastSyncDate, streamId, writeToken', [lastSyncField, streamId, writeToken]);
   var createPagesToFetch = function (totalPages) {
-    return _.range(1, totalPages + 1);
+    if(totalPages === undefined){
+      logWarning(req, username, 'total pages is undefined');
+      throw [];
+    }
+
+    var result = _.range(1, totalPages + 1);
+    logDebug(req, username, 'total pages is ', totalPages);
+    logDebug(req, username, 'pages to fetch is ', result);
+
+    if(result === []){
+      throw result;
+    }
+
+    return result;
   };
 
   var create1SelfEvents = function (recentTracksInfo) {
@@ -141,6 +158,11 @@ exports.index = function (req, res) {
   };
 
   var fetchRecentTracks = function (pagesToBeFetched) {
+    if(pagesToBeFetched === undefined){
+      logWarning(req, username, 'pages to be fetched is undefined');
+      throw 'pages to be fetched is undefined for user ' + username;
+    }
+
     return pagesToBeFetched
       .reduce(function (chain, page) {
         logDebug(req, username, "creating promise chain for page: ", page);

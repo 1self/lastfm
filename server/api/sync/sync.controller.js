@@ -148,6 +148,11 @@ exports.index = function (req, res) {
             deferred.reject('recenttracks.track is undefined for user ' + username);
           }
 
+          // sometimes we seem to get back a single track, not inside an array
+          if(recentTrackData.recenttracks.track.length === undefined){
+            recentTrackData.recenttracks.track = [recentTrackData.recenttracks.track];
+          }
+
           logDebug(req, username, 'recenttracks count: ', recentTrackData.recenttracks.track.length);
           logSilly(req, username, 'recenttracks.track', recentTrackData.recenttracks.track);
           deferred.resolve(recentTrackData.recenttracks.track);

@@ -21,7 +21,7 @@ var logError = function(req, username, message, object){
 }
 
 var logWarning = function(req, username, message, object){
-  req.app.logger.warning(username + ': ' + message, object);
+  //req.app.logger.warning(username + ': ' + message, object);
 }
 
 exports.index = function (req, res) {

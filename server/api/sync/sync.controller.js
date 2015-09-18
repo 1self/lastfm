@@ -108,11 +108,12 @@ exports.index = function (req, res) {
     return deferred.promise;
   };
 
-  var getRecentTracksForUser = function (username, pageNum) {
+  var getRecentTracksForUser = function (username, pageNum, lastSyncField) {
     var deferred = q.defer();
     var url = "http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&api_key=0900562e22abd0500f0432147482cfc1&format=json&limit=200";
     url += "&page=" + pageNum;
     url += "&user=" + username;
+    url = addLastSyncToUrl(url, lastSyncField);
 
     logDebug(req, username, 'getting recent tracks for user: url', url)
     request({
@@ -162,7 +163,7 @@ exports.index = function (req, res) {
     return deferred.promise;
   };
 
-  var fetchRecentTracks = function (pagesToBeFetched) {
+  var fetchRecentTracks = function (pagesToBeFetched, lastSyncField) {
     if(pagesToBeFetched === undefined){
       logWarning(req, username, 'pages to be fetched is undefined');
       throw 'pages to be fetched is undefined for user ' + username;
@@ -173,14 +174,14 @@ exports.index = function (req, res) {
         logDebug(req, username, "creating promise chain for page: ", page);
         return chain
           .then(function () {
-            return getRecentTracksForUser(username, page)
+            return getRecentTracksForUser(username, page, lastSyncField)
           })
           .then(create1SelfEvents)
           .then(sendEventsTo1self)
           .then(function (body) {
             logInfo(req, username, "events sent to 1self: page", page);
           }, function (error) {
-            logError.log(req, username, "error sending page: page, err ", [page, error]);
+            logError(req, username, "error sending page: page, err ", [page, error]);
           });
       }, q.resolve());
 
@@ -235,15 +236,20 @@ exports.index = function (req, res) {
     return deferred.promise;
   };
 
+  var addLastSyncToUrl = function(url, lastSyncDate){
+    if (lastSyncField !== undefined && lastSyncField !== '{{latestSyncField}}') {
+      var unixTimeStamp = Date.parse(lastSyncField) / 1000;
+      url += "&from=" + unixTimeStamp;
+    }
+
+    return url;
+  }
   var numberOfPagesToFetch = function (username, lastSyncDate) {
     var deferred = q.defer();
     var limit = 200;
     var url = "http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&api_key=0900562e22abd0500f0432147482cfc1&format=json&limit=200";
     url += "&user=" + username;
-    if (lastSyncField !== undefined && lastSyncField !== '{{latestSyncField}}') {
-      var unixTimeStamp = Date.parse(lastSyncField) / 1000;
-      url += "&from=" + unixTimeStamp;
-    }
+    url = addLastSyncToUrl(url, lastSyncDate);
 
     logDebug(req, username, 'calculating number of pages to fetch: url', url);
 
@@ -259,7 +265,10 @@ exports.index = function (req, res) {
       logSilly(req, username, "lastfm returned pages: data", data);
       if(data.recenttracks && data.recenttracks["@attr"]){
         var totalPages = data.recenttracks["@attr"].totalPages;
+        var totalTracks = data.recenttracks["@attr"].total;
         logDebug(req, username, "totalPages", totalPages);
+        logDebug(req, username, 'total tracks', totalTracks)
+
         deferred.resolve(parseInt(totalPages));
       }
       else {
@@ -279,7 +288,9 @@ exports.index = function (req, res) {
     .then(createPagesToFetch, function(){
       res.status(200).send("Nothing to sync, everything up-to-date...");
     })
-    .then(fetchRecentTracks)
+    .then(function(pagesToBeFetched){
+      fetchRecentTracks(pagesToBeFetched, lastSyncField);
+    })
     .then(function () {
       var diff = process.hrtime(start);
       logInfo(req, username, 'sync complete, took:', diff);

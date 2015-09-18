@@ -21,7 +21,7 @@ var logError = function(req, username, message, object){
 }
 
 var logWarning = function(req, username, message, object){
-  //req.app.logger.warning(username + ': ' + message, object);
+  req.app.logger.warn(username + ': ' + message, object);
 }
 
 exports.index = function (req, res) {
@@ -59,8 +59,16 @@ exports.index = function (req, res) {
         return null;
       }
 
-      var listenDate = recentTrackInfo.date.uts;
+      // sometimes lastfm has data that it doesn't know the precise date for.
+      // we ignore those here:
+      var listenDate = recentTrackInfo.date.uts * 1;
+      if(listenDate === 0){
+        logWarning(req, 'ignoring track play with unknown date');
+        return null;  
+      }
+
       dt.setTime(listenDate * 1000);
+
       return {
         "dateTime": dt.toISOString(),
         "objectTags": ["music"],  
@@ -186,6 +194,7 @@ exports.index = function (req, res) {
       }, q.resolve());
 
   };
+  
   var createSyncStartEvent = function () {
     return {
       "dateTime": new Date().toISOString(),
@@ -289,7 +298,7 @@ exports.index = function (req, res) {
       res.status(200).send("Nothing to sync, everything up-to-date...");
     })
     .then(function(pagesToBeFetched){
-      fetchRecentTracks(pagesToBeFetched, lastSyncField);
+      return fetchRecentTracks(pagesToBeFetched, lastSyncField);
     })
     .then(function () {
       var diff = process.hrtime(start);

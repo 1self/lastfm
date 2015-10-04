@@ -16,7 +16,7 @@ var server = require('http').createServer(app);
 require('./config/express')(app);
 require('./routes')(app);
 
-var logfileLocation = process.env.LOGFILE_LOCATION || './';
+var logfileLocation = process.env.LOGGINGDIR || './';
 var loggingfilename = path.join(logfileLocation, 'lastfm.log');
 var winston = require('winston');
 

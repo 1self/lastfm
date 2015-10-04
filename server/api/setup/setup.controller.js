@@ -31,8 +31,9 @@ exports.index = function (req, res) {
   var username = req.body.username;
   var oneselfUsername = req.body.oneselfUsername;
   var registrationToken = req.body.registrationToken;
+  var redirectUri = req.body.redirectUri;
   logInfo(req, oneselfUsername, 'setting up integration', username);
-  logDebug(req, username, 'username, registrationToken: ', [username, registrationToken]);
+  logDebug(req, username, 'username, registrationToken, redirectUri: ', [username, registrationToken, redirectUri]);
   if (username === undefined || username.length === 0) {
     res.status(400).json({
       status: "username is blank"
@@ -116,7 +117,6 @@ exports.index = function (req, res) {
     createStream(oneselfUsername, registrationToken) 
       .then(function (stream) {
         sync(stream);
-        var redirectUri = CONTEXT_URI + '/integrations';
         logDebug(req, username, 'sending redirect: ', redirectUri)
         res.status(200).send({redirect: redirectUri});
       }).catch(function (error) {

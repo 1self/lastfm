@@ -118,10 +118,10 @@ exports.index = function (req, res) {
       .then(function (stream) {
         sync(stream);
         logDebug(req, username, 'sending redirect: ', redirectUri)
-        res.status(200).send({redirect: redirectUri});
+        res.status(200).send({redirect: redirectUri + "?success=true"});
       }).catch(function (error) {
         logError(req, username, 'error in create stream promise chain: ', error);
-        res.status(200).send();
+        res.status(200).send({redirect: redirectUri + "?success=false"});
       });
   }
 };

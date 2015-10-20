@@ -107,7 +107,9 @@ exports.index = function (req, res) {
     }, function (err, response, body) {
       if (err) {
         deferred.reject(err);
+        return;
       }
+      
       if (response.statusCode === 404) {
         deferred.reject("Stream Not Found!")
       }
@@ -140,6 +142,7 @@ exports.index = function (req, res) {
         if(recentTrackData === undefined){
           logError(req, username, 'recent track data is undefined, request url:', url);
           deferred.reject('recent track data is undefined for user ' + username);
+          return;
         }
 
         if (recentTrackData.error) {
@@ -235,11 +238,15 @@ exports.index = function (req, res) {
       if (err) {
         logDebug(req, username, 'error sending sync event: error', err);
         deferred.reject(err);
+        return;
       }
+
       if (response.statusCode === 404) {
         logDebug(req, username, 'error sending sync event: responseCode', response.statusCode);
         deferred.reject("Stream Not Found!");
+        return;
       }
+
       deferred.resolve(body);
     });
     return deferred.promise;
@@ -269,7 +276,9 @@ exports.index = function (req, res) {
     }, function (error, response, body) {
       if (error) {
         deferred.reject(error);
+        return;
       }
+
       var data = JSON.parse(body);
       logSilly(req, username, "lastfm returned pages: data", data);
       if(data.recenttracks && data.recenttracks["@attr"]){

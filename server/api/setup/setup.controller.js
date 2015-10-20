@@ -68,7 +68,9 @@ exports.index = function (req, res) {
     }, function (e, response, body) {
       if (e) {
         deferred.reject("Error: ", e);
+        return;
       }
+
       if(response === undefined){
         logDebug(req, username, 'no response, streamPostUri: ', streamPostUri);
         deferred.reject('no response');
@@ -100,6 +102,7 @@ exports.index = function (req, res) {
         deferred.reject(e);
         return;
       }
+      
       if (response.statusCode !== 200) {
         deferred.reject(response);
         return;

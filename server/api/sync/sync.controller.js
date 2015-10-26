@@ -255,9 +255,12 @@ exports.index = function (req, res) {
   var addLastSyncToUrl = function(url, lastSyncDate){
     if (lastSyncField !== undefined && lastSyncField !== '{{latestSyncField}}') {
       var unixTimeStamp = Date.parse(lastSyncField) / 1000;
-      url += "&from=" + unixTimeStamp + 1;  // the lastfm api works on a greater than or equal to basis for the from field
-                                            // This means we need to add one to the timestamp to ensure we don't get the last
-                                            // event from the previous sync.
+      // the lastfm api works on a greater than or equal to basis for the from field
+      // This means we need to add one to the timestamp to ensure we don't get the last
+      // event from the previous sync.
+      var adjustedUnixTimeStamp = unixTimeStamp + 1;
+      logDebug('incrementing the lastsyncfield, ', [unixTimeStamp, adjustedUnixTimeStamp]);
+      url += "&from=" + adjustedUnixTimeStamp;  
     }
 
     return url;

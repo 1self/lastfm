@@ -46,7 +46,9 @@ exports.index = function (req, res) {
   };
 
   var create1SelfEvents = function (recentTracksInfo) {
-    return recentTracksInfo
+    var warnListenDateCount = 0;
+
+    var result = recentTracksInfo
     .map(function (recentTrackInfo) {
       var dt = new Date();
 
@@ -60,7 +62,8 @@ exports.index = function (req, res) {
       // we ignore those here:
       var listenDate = recentTrackInfo.date.uts * 1;
       if(listenDate === 0){
-        logWarning(req, 'ignoring track play with unknown date');
+        logSilly(req, username, 'ignoring track play with unknown date', recentTrackInfo);
+        warnListenDateCount++;
         return null;  
       }
 
@@ -85,11 +88,17 @@ exports.index = function (req, res) {
     .filter(function(value){
       return value !== null;
     });
+
+    if(warnListenDateCount > 0){
+      logWarning(req, username, warnListenDateCount + " had no listen date", '');
+    }
+
+    return result;
   };
 
   var sendEventsTo1self = function (events) {
     if(events.length === 0){
-      logDebug(req, username, 'no events to send');
+      logDebug(req, username, 'no events to send', '');
       return events;
     }
     var deferred = q.defer();

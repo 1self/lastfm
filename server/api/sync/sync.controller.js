@@ -42,15 +42,12 @@ exports.index = function (req, res) {
     logDebug(req, username, 'total pages is ', totalPages);
     logDebug(req, username, 'pages to fetch is ', result);
 
-    if(result === []){
-      throw result;
-    }
-
     return result;
   };
 
   var create1SelfEvents = function (recentTracksInfo) {
-    return recentTracksInfo.map(function (recentTrackInfo) {
+    return recentTracksInfo
+    .map(function (recentTrackInfo) {
       var dt = new Date();
 
       // you don't get a date for tracks that are currently playing. We'll
@@ -80,15 +77,21 @@ exports.index = function (req, res) {
           "artist-name": recentTrackInfo.artist["#text"],
           "album-name": recentTrackInfo.album["#text"],
         },
-        "source": "last.fm",
         "latestSyncField": {
           "$date": dt.toISOString()
         }
       };
+    })
+    .filter(function(value){
+      return value !== null;
     });
   };
 
   var sendEventsTo1self = function (events) {
+    if(events.length === 0){
+      logDebug(req, username, 'no events to send');
+      return events;
+    }
     var deferred = q.defer();
 
     var batchApiUri = ONESELF_API + '/v1/streams/' + streamId + '/events/batch';
@@ -203,17 +206,28 @@ exports.index = function (req, res) {
       "dateTime": new Date().toISOString(),
       "objectTags": ["1self", "integration", "sync"],
       "actionTags": ["start"],
-      "source": "last.fm",
       "properties": {
       }
     };
   };
+
+  var createSyncErrorEvent = function (error) {
+    return {
+      "dateTime": new Date().toISOString(),
+      "objectTags": ["1self", "integration", "sync"],
+      "actionTags": ["error"],
+      "properties": {
+          "code": error.code,
+          "message": error.message
+      }
+    };
+  };
+
   var createSyncCompleteEvent = function () {
     return {
       "dateTime": new Date().toISOString(),
       "objectTags": ["1self", "integration", "sync"],
       "actionTags": ["complete"],
-      "source": "last.fm",
       "properties": {
       }
     };
@@ -259,7 +273,7 @@ exports.index = function (req, res) {
       // This means we need to add one to the timestamp to ensure we don't get the last
       // event from the previous sync.
       var adjustedUnixTimeStamp = unixTimeStamp + 1;
-      logDebug('incrementing the lastsyncfield, ', [unixTimeStamp, adjustedUnixTimeStamp]);
+      logDebug(req, 'incrementing the lastsyncfield, ', [unixTimeStamp, adjustedUnixTimeStamp]);
       url += "&from=" + adjustedUnixTimeStamp;  
     }
 
@@ -270,7 +284,7 @@ exports.index = function (req, res) {
     var limit = 200;
     var url = "http://ws.audioscrobbler.com/2.0/?method=user.getrecenttracks&api_key=0900562e22abd0500f0432147482cfc1&format=json&limit=200";
     url += "&user=" + username;
-    url = addLastSyncToUrl(url, lastSyncDate);
+    url = addLastSyncToUrl(url, lastSyncDate, req);
 
     logDebug(req, username, 'calculating number of pages to fetch: url', url);
 
@@ -294,8 +308,17 @@ exports.index = function (req, res) {
 
         deferred.resolve(parseInt(totalPages));
       }
-      else {
-        deferred.reject("No pages to fetch!");
+      else if(data.error === 6){
+        deferred.reject({
+          code: 404,
+          message: "user not found"
+        })
+      }
+      else {        
+        deferred.reject({
+          code: 500,
+          message: "No pages found for user"
+        });
       }
     });
     return deferred.promise;
@@ -307,11 +330,13 @@ exports.index = function (req, res) {
     .then(function () {
       logInfo(req, username, 'sync started, lastSyncField:', lastSyncField);
       return numberOfPagesToFetch(username, lastSyncField);
-    })
-    .then(createPagesToFetch, function(){
-      res.status(200).send("Nothing to sync, everything up-to-date...");
-    })
+    }, function() {})
+    .then(createPagesToFetch)
     .then(function(pagesToBeFetched){
+      if(pagesToBeFetched === []){
+        res.status(200).send("Nothing to sync, everything up-to-date...");
+        return pagesToBeFetched;
+      }
       return fetchRecentTracks(pagesToBeFetched, lastSyncField);
     })
     .then(function () {
@@ -324,6 +349,10 @@ exports.index = function (req, res) {
       res.status(200).send("Synced all the events");
     })
     .catch(function(error) {
+      send1SelfSyncEvent(createSyncErrorEvent(error))
+      .then(function(){
+        res.status(500).send(error.message);
+      })
       logError(req, username, "error sycning, error:", error);
     })
 };
